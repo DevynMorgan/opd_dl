@@ -3,9 +3,17 @@ import { Pool } from "pg";
 let pool: Pool | undefined;
 
 function getDatabaseUrl() {
-  // Neon's Vercel integration prefixes generated variables with the resource name.
-  // Support both the standard name and the connected OPDD1 resource name.
-  return process.env.DATABASE_URL || process.env.opdd1_DATABASE_URL || process.env.OPDD1_DATABASE_URL;
+  // Vercel/Neon may expose the connection string as DATABASE_URL or as a
+  // resource-prefixed variable such as OPDD1_DATABASE_URL. Detect either form
+  // without requiring the database resource name to be hard-coded.
+  const direct = process.env.DATABASE_URL;
+  if (direct) return direct;
+
+  const prefixed = Object.entries(process.env).find(([key, value]) => {
+    return /_DATABASE_URL$/i.test(key) && Boolean(value);
+  });
+
+  return prefixed?.[1];
 }
 
 function getPool() {
@@ -137,7 +145,7 @@ export async function ensureSchema() {
       CREATE INDEX IF NOT EXISTS incidents_number_idx ON incidents(incident_number);
     `);
 
-    const count = await p.query<{ count: string}>("SELECT COUNT(*)::text AS count FROM people");
+    const count = await p.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM people");
     if (count.rows[0].count === "0") {
       const client = await p.connect();
       try {
@@ -153,7 +161,7 @@ export async function ensureSchema() {
         ];
         const ids: number[] = [];
         for (const person of people) {
-          const r = await client.query<{id: number}>(
+          const r = await client.query<{ id: number }>(
             `INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`, person);
           ids.push(r.rows[0].id);
