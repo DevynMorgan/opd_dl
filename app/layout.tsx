@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./additional.css";
 
 export const metadata: Metadata = {
   title: "Opaline Police Department | Records Terminal",
