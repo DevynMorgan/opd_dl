@@ -3,9 +3,11 @@ import { Pool, PoolClient } from "pg";
 let pool: Pool | undefined;
 
 function getDatabaseUrl() {
-  // The Supabase Vercel integration provisions POSTGRES_URL. Prefer it so
-  // an older Neon DATABASE_URL cannot accidentally be selected.
+  // Supabase's Vercel integration provides both pooled and non-pooled
+  // PostgreSQL URLs. Use the direct/non-pooled URL first because this app
+  // initializes its schema inside a transaction and writes persistent data.
   return (
+    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.POSTGRES_URL ||
     process.env.POSTGRES_PRISMA_URL ||
     process.env.SUPABASE_DB_URL ||
