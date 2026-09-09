@@ -37,9 +37,6 @@ export function db() {
 }
 
 async function createSchema(client: PoolClient) {
-  // Vercel can run several serverless instances at the same time. A module-level
-  // promise only protects one instance, so use a PostgreSQL transaction advisory
-  // lock to make first-run schema creation safe across all instances.
   await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v1'))");
 
   await client.query(`
@@ -161,7 +158,7 @@ async function createSchema(client: PoolClient) {
   for (const person of people) {
     const r = await client.query<{ id: number }>(
       `INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes)
-       VALUES ($1,$2,$3::date,$4::text,$5::text,$6::text,$7::text,$8::text,$9::text,$10::text,$11::text)
+       VALUES ($1::text,$2::text,$3::date,$4::text,$5::text,$6::text,$7::text,$8::text,$9::text,$10::text,$11::text)
        RETURNING id`,
       person,
     );
@@ -169,25 +166,25 @@ async function createSchema(client: PoolClient) {
   }
 
   await client.query(`INSERT INTO licenses (person_id,license_number,license_class,status,issue_date,expiration_date,restrictions,notes) VALUES
-    ($1,'OP-482917','C','VALID','2024-04-17','2029-04-17','None','Fictional RP record'),
-    ($2,'OP-318204','C','SUSPENDED','2023-11-02','2028-11-02','Corrective lenses','Fictional RP record'),
-    ($3,'OP-337221','C','VALID','2025-06-22','2030-06-22','None','Fictional RP record'),
-    ($4,'OP-7719','C','VALID','2022-12-09','2027-12-09','None','Fictional RP record'),
-    ($7,'OP-771493','C','VALID','2024-08-21','2029-08-21','None','Fictional RP record')`, ids);
+    ($1::bigint,'OP-482917','C','VALID','2024-04-17','2029-04-17','None','Fictional RP record'),
+    ($2::bigint,'OP-318204','C','SUSPENDED','2023-11-02','2028-11-02','Corrective lenses','Fictional RP record'),
+    ($3::bigint,'OP-337221','C','VALID','2025-06-22','2030-06-22','None','Fictional RP record'),
+    ($4::bigint,'OP-7719','C','VALID','2022-12-09','2027-12-09','None','Fictional RP record'),
+    ($5::bigint,'OP-771493','C','VALID','2024-08-21','2029-08-21','None','Fictional RP record')`, [ids[0],ids[1],ids[2],ids[3],ids[6]]);
 
   await client.query(`INSERT INTO vehicles (person_id,plate,vin,year,make,model,color,registration_status,notes) VALUES
-    ($2,'OP-VALE','RP2019VALE0001',2019,'Black','Sedan','Black','ACTIVE','Fictional RP record'),
-    ($3,'OP-KIT2','RP2024KIT0001',2024,'Black','SUV','Black','ACTIVE','Fictional RP record'),
-    ($4,'OP-MORR','RP2020MOR0001',2020,'Gray','Pickup','Gray','ACTIVE','Fictional RP record'),
-    ($5,'OP-CALD','RP2018CAL0001',2018,'Red','Coupe','Red','ACTIVE','Fictional RP record'),
-    ($7,'OP-HOLL','RP2022HOL0001',2022,'Gray','Pickup','Gray','ACTIVE','Fictional RP record')`, ids);
+    ($2::bigint,'OP-VALE','RP2019VALE0001',2019,'Black','Sedan','Black','ACTIVE','Fictional RP record'),
+    ($3::bigint,'OP-KIT2','RP2024KIT0001',2024,'Black','SUV','Black','ACTIVE','Fictional RP record'),
+    ($4::bigint,'OP-MORR','RP2020MOR0001',2020,'Gray','Pickup','Gray','ACTIVE','Fictional RP record'),
+    ($5::bigint,'OP-CALD','RP2018CAL0001',2018,'Red','Coupe','Red','ACTIVE','Fictional RP record'),
+    ($7::bigint,'OP-HOLL','RP2022HOL0001',2022,'Gray','Pickup','Gray','ACTIVE','Fictional RP record')`, ids);
 
   await client.query(`INSERT INTO citations (person_id,citation_number,charge,location,status,issued_at,officer,notes) VALUES
-    ($4,'CIT-260901','Failure to obey traffic control','Opaline Ave','OPEN','2026-09-01 14:20:00','1027','Fictional RP record'),
-    ($5,'CIT-260884','Expired registration','North Ridge Rd','PAID','2026-08-28 10:15:00','1033','Fictional RP record')`);
+    ($4::bigint,'CIT-260901','Failure to obey traffic control','Opaline Ave','OPEN','2026-09-01 14:20:00','1027','Fictional RP record'),
+    ($5::bigint,'CIT-260884','Expired registration','North Ridge Rd','PAID','2026-08-28 10:15:00','1033','Fictional RP record')`, ids);
 
   await client.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES
-    ($5,'W-260117','Failure to appear','STANDARD','ACTIVE','2026-09-02 09:00:00','Opaline County','1033','Fictional RP record')`);
+    ($5::bigint,'W-260117','Failure to appear','STANDARD','ACTIVE','2026-09-02 09:00:00','Opaline County','1033','Fictional RP record')`, ids);
 
   await client.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes) VALUES
     ('INC-260905-01','Missing Person Report','Opaline','OPEN','2026-09-05 06:15:00','1027','Fictional RP record'),
