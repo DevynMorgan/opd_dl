@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, UserRound, Car, FileWarning, FileText, BarChart3, Mail, Settings, RotateCcw, LogOut, UserPlus, History, AlertTriangle, Shield, CalendarDays, IdCard, UsersRound } from "lucide-react";
+import { Search, UserRound, Car, FileText, BarChart3, Mail, Settings, RotateCcw, LogOut, UserPlus, History, AlertTriangle, Shield, CalendarDays, IdCard, UsersRound } from "lucide-react";
 
 const records = [
   {name:"Bryce Fane",license:"OP-482917",dob:"04/17/1998",status:"VALID",type:"License",first:"Bryce",last:"Fane",vehicle:"No registered vehicles"},
