@@ -3,13 +3,13 @@ import { Pool, PoolClient } from "pg";
 let pool: Pool | undefined;
 
 function getDatabaseUrl() {
-  // Prefer the Supabase/Vercel Postgres connection variables already
-  // provisioned by the integration. Keep explicit aliases as fallbacks.
+  // The Supabase Vercel integration provisions POSTGRES_URL. Prefer it so
+  // an older Neon DATABASE_URL cannot accidentally be selected.
   return (
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
     process.env.SUPABASE_DB_URL ||
     process.env.SUPABASE_DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.DATABASE_URL
   );
 }
