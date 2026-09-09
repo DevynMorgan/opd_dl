@@ -3,11 +3,13 @@ import { Pool, PoolClient } from "pg";
 let pool: Pool | undefined;
 
 function getDatabaseUrl() {
-  // Supabase PostgreSQL connection string. Keep DATABASE_URL as a fallback
-  // so the app remains portable, but prefer the explicit Supabase setting.
+  // Prefer the Supabase/Vercel Postgres connection variables already
+  // provisioned by the integration. Keep explicit aliases as fallbacks.
   return (
     process.env.SUPABASE_DB_URL ||
     process.env.SUPABASE_DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.DATABASE_URL
   );
 }
@@ -15,7 +17,7 @@ function getDatabaseUrl() {
 function getPool() {
   const connectionString = getDatabaseUrl();
   if (!connectionString) {
-    throw new Error("SUPABASE_DB_URL is not configured. Add the Supabase PostgreSQL connection string to Vercel.");
+    throw new Error("No Supabase/Postgres database connection variable is configured in Vercel.");
   }
   if (!pool) {
     pool = new Pool({
@@ -169,7 +171,7 @@ async function createSchema(client: PoolClient) {
     ($2::bigint,'OP-318204','C','SUSPENDED','2023-11-02','2028-11-02','Corrective lenses','Fictional RP record'),
     ($3::bigint,'OP-337221','C','VALID','2025-06-22','2030-06-22','None','Fictional RP record'),
     ($4::bigint,'OP-7719','C','VALID','2022-12-09','2027-12-09','None','Fictional RP record'),
-    ($5::bigint,'OP-771493','C','VALID','2024-08-21','2029-08-21','None','Fictional RP record')`, [ids[0],ids[1],ids[2],ids[3],ids[6]]);
+    ($5::bigint,'OP-771493','C','VALID','2024-08-21','2029-08-21','None','Fictional RP record')`, [ids[0], ids[1], ids[2], ids[3], ids[6]]);
 
   await client.query(`INSERT INTO vehicles (person_id,plate,vin,year,make,model,color,registration_status,notes) VALUES
     ($2::bigint,'OP-VALE','RP2019VALE0001',2019,'Black','Sedan','Black','ACTIVE','Fictional RP record'),
