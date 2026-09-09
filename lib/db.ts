@@ -2,13 +2,20 @@ import { Pool } from "pg";
 
 let pool: Pool | undefined;
 
+function getDatabaseUrl() {
+  // Neon's Vercel integration prefixes generated variables with the resource name.
+  // Support both the standard name and the connected OPDD1 resource name.
+  return process.env.DATABASE_URL || process.env.opdd1_DATABASE_URL || process.env.OPDD1_DATABASE_URL;
+}
+
 function getPool() {
-  if (!process.env.DATABASE_URL) {
+  const connectionString = getDatabaseUrl();
+  if (!connectionString) {
     throw new Error("DATABASE_URL is not configured. Connect a PostgreSQL database to this Vercel project.");
   }
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString,
       ssl: { rejectUnauthorized: false },
       max: 5,
       idleTimeoutMillis: 10000,
