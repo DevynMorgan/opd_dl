@@ -2,17 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
-
 const categories = ["people", "licenses", "vehicles", "citations", "warrants", "incidents", "messages"] as const;
 type Category = typeof categories[number];
-
-function isCategory(value: string): value is Category {
-  return categories.includes(value as Category);
-}
-
-function clean(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
+const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const isCategory = (value: string): value is Category => categories.includes(value as Category);
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,27 +15,34 @@ export async function GET(request: NextRequest) {
     const q = clean(searchParams.get("q"));
     const limit = Math.min(Math.max(Number(searchParams.get("limit") || 50), 1), 200);
     const p = db();
-
     if (!isCategory(type)) return NextResponse.json({ error: "Unknown record type" }, { status: 400 });
 
     if (type === "people") {
-      const result = await p.query(`SELECT * FROM people WHERE ($1='' OR first_name ILIKE '%'||$1||'%' OR last_name ILIKE '%'||$1||'%' OR COALESCE(alias,'') ILIKE '%'||$1||'%') ORDER BY last_name, first_name LIMIT $2`, [q, limit]);
+      const result = await p.query(`
+        SELECT p.*, COALESCE(l.license_number,'') AS license_number,
+          COALESCE(l.status,'NO LICENSE') AS license_status,
+          COALESCE(v.vehicle_label,'No registered vehicles') AS vehicle_label
+        FROM people p
+        LEFT JOIN LATERAL (SELECT license_number,status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1) l ON true
+        LEFT JOIN LATERAL (SELECT CONCAT(year,' ',COALESCE(color,''),' ',COALESCE(make,''),' ',COALESCE(model,'')) AS vehicle_label FROM vehicles WHERE person_id=p.id ORDER BY id DESC LIMIT 1) v ON true
+        WHERE ($1='' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||$1||'%' OR p.first_name ILIKE '%'||$1||'%' OR p.last_name ILIKE '%'||$1||'%' OR COALESCE(p.alias,'') ILIKE '%'||$1||'%' OR COALESCE(TO_CHAR(p.dob,'MM/DD/YYYY'),'') ILIKE '%'||$1||'%')
+        ORDER BY p.last_name,p.first_name LIMIT $2`, [q, limit]);
       return NextResponse.json(result.rows);
     }
     if (type === "licenses") {
-      const result = await p.query(`SELECT l.*, p.first_name, p.last_name, p.dob FROM licenses l JOIN people p ON p.id=l.person_id WHERE ($1='' OR l.license_number ILIKE '%'||$1||'%' OR p.first_name ILIKE '%'||$1||'%' OR p.last_name ILIKE '%'||$1||'%') ORDER BY p.last_name, p.first_name LIMIT $2`, [q, limit]);
+      const result = await p.query(`SELECT l.*,p.first_name,p.last_name,p.dob,p.height,p.weight,p.eyes,p.hair,p.address,p.notes AS person_notes FROM licenses l JOIN people p ON p.id=l.person_id WHERE ($1='' OR l.license_number ILIKE '%'||$1||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||$1||'%' OR TO_CHAR(p.dob,'MM/DD/YYYY') ILIKE '%'||$1||'%') ORDER BY p.last_name,p.first_name LIMIT $2`, [q, limit]);
       return NextResponse.json(result.rows);
     }
     if (type === "vehicles") {
-      const result = await p.query(`SELECT v.*, p.first_name, p.last_name FROM vehicles v LEFT JOIN people p ON p.id=v.person_id WHERE ($1='' OR v.plate ILIKE '%'||$1||'%' OR COALESCE(v.vin,'') ILIKE '%'||$1||'%' OR COALESCE(v.make,'') ILIKE '%'||$1||'%' OR COALESCE(v.model,'') ILIKE '%'||$1||'%' OR COALESCE(p.first_name,'') ILIKE '%'||$1||'%' OR COALESCE(p.last_name,'') ILIKE '%'||$1||'%') ORDER BY v.id DESC LIMIT $2`, [q, limit]);
+      const result = await p.query(`SELECT v.*,p.first_name,p.last_name,CONCAT_WS(' ',p.first_name,p.last_name) AS owner FROM vehicles v LEFT JOIN people p ON p.id=v.person_id WHERE ($1='' OR v.plate ILIKE '%'||$1||'%' OR COALESCE(v.vin,'') ILIKE '%'||$1||'%' OR CONCAT_WS(' ',v.year,v.make,v.model,v.color) ILIKE '%'||$1||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||$1||'%') ORDER BY v.id DESC LIMIT $2`, [q, limit]);
       return NextResponse.json(result.rows);
     }
     if (type === "citations") {
-      const result = await p.query(`SELECT c.*, p.first_name, p.last_name FROM citations c LEFT JOIN people p ON p.id=c.person_id WHERE ($1='' OR c.citation_number ILIKE '%'||$1||'%' OR c.charge ILIKE '%'||$1||'%' OR COALESCE(p.first_name,'') ILIKE '%'||$1||'%' OR COALESCE(p.last_name,'') ILIKE '%'||$1||'%') ORDER BY c.issued_at DESC LIMIT $2`, [q, limit]);
+      const result = await p.query(`SELECT c.*,CONCAT_WS(' ',p.first_name,p.last_name) AS name FROM citations c LEFT JOIN people p ON p.id=c.person_id WHERE ($1='' OR c.citation_number ILIKE '%'||$1||'%' OR c.charge ILIKE '%'||$1||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||$1||'%') ORDER BY c.issued_at DESC LIMIT $2`, [q, limit]);
       return NextResponse.json(result.rows);
     }
     if (type === "warrants") {
-      const result = await p.query(`SELECT w.*, p.first_name, p.last_name FROM warrants w LEFT JOIN people p ON p.id=w.person_id WHERE ($1='' OR w.warrant_number ILIKE '%'||$1||'%' OR w.title ILIKE '%'||$1||'%' OR COALESCE(p.first_name,'') ILIKE '%'||$1||'%' OR COALESCE(p.last_name,'') ILIKE '%'||$1||'%') ORDER BY w.issued_at DESC LIMIT $2`, [q, limit]);
+      const result = await p.query(`SELECT w.*,CONCAT_WS(' ',p.first_name,p.last_name) AS name FROM warrants w LEFT JOIN people p ON p.id=w.person_id WHERE ($1='' OR w.warrant_number ILIKE '%'||$1||'%' OR w.title ILIKE '%'||$1||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||$1||'%') ORDER BY w.issued_at DESC LIMIT $2`, [q, limit]);
       return NextResponse.json(result.rows);
     }
     if (type === "incidents") {
@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const type = clean(body.type);
     const p = db();
-
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
       const r = await p.query(`INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`, [clean(body.first_name),clean(body.last_name),body.dob||null,clean(body.alias),clean(body.address),clean(body.height),clean(body.weight),clean(body.eyes),clean(body.hair),clean(body.status)||"ACTIVE",clean(body.notes)]);
