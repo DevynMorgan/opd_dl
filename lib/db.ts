@@ -3,20 +3,19 @@ import { Pool, PoolClient } from "pg";
 let pool: Pool | undefined;
 
 function getDatabaseUrl() {
-  const direct = process.env.DATABASE_URL;
-  if (direct) return direct;
-
-  const prefixed = Object.entries(process.env).find(([key, value]) => {
-    return /_DATABASE_URL$/i.test(key) && Boolean(value);
-  });
-
-  return prefixed?.[1];
+  // Supabase PostgreSQL connection string. Keep DATABASE_URL as a fallback
+  // so the app remains portable, but prefer the explicit Supabase setting.
+  return (
+    process.env.SUPABASE_DB_URL ||
+    process.env.SUPABASE_DATABASE_URL ||
+    process.env.DATABASE_URL
+  );
 }
 
 function getPool() {
   const connectionString = getDatabaseUrl();
   if (!connectionString) {
-    throw new Error("DATABASE_URL is not configured. Connect a PostgreSQL database to this Vercel project.");
+    throw new Error("SUPABASE_DB_URL is not configured. Add the Supabase PostgreSQL connection string to Vercel.");
   }
   if (!pool) {
     pool = new Pool({
