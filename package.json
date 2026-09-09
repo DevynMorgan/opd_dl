@@ -8,8 +8,10 @@
     "start": "next start"
   },
   "dependencies": {
+    "@types/pg": "latest",
     "lucide-react": "latest",
     "next": "latest",
+    "pg": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
