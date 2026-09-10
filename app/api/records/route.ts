@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const p = db();
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
-      const r = await p.query(`INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes) VALUES (${sqlText(body.first_name)},${sqlText(body.last_name)},${sqlNullableDate(body.dob)},${sqlNullableText(body.alias)},${sqlNullableText(body.address)},${sqlNullableText(body.height)},${sqlNullableText(body.weight)},${sqlNullableText(body.eyes)},${sqlNullableText(body.hair)},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableText(body.notes)}) RETURNING *`);
+      const r = await p.query(`INSERT INTO people (first_name,last_name,dob,gender,alias,address,height,weight,eyes,hair,status,notes) VALUES (${sqlText(body.first_name)},${sqlText(body.last_name)},${sqlNullableDate(body.dob)},${sqlNullableText(body.gender)},${sqlNullableText(body.alias)},${sqlNullableText(body.address)},${sqlNullableText(body.height)},${sqlNullableText(body.weight)},${sqlNullableText(body.eyes)},${sqlNullableText(body.hair)},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableText(body.notes)}) RETURNING *`);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "licenses") {
@@ -143,7 +143,7 @@ export async function PUT(request: NextRequest) {
 
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
-      const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
+      const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, gender=${sqlNullableText(body.gender)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
 
       if (body.license_number !== undefined) {
