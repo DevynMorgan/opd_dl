@@ -2,7 +2,8 @@ name: Add license editing
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -16,30 +17,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Patch license editing into person records
-        shell: python
+      - name: Patch files
         run: |
+          python3 - <<'PY'
           from pathlib import Path
 
-          page = Path('app/page.tsx')
+          page = Path("app/page.tsx")
           text = page.read_text()
-
-          old = 'const [notes, setNotes] = useState(record.notes || "");'
-          new = 'const [notes, setNotes] = useState(record.notes || "");\n  const [licenseNumber, setLicenseNumber] = useState(record.license_number || "");'
-          if old in text and 'const [licenseNumber, setLicenseNumber]' not in text:
-              text = text.replace(old, new, 1)
-
-          old = 'onSave({ first_name: first, last_name: last, dob, alias, address, height, weight, eyes, hair, status, notes })'
-          new = 'onSave({ first_name: first, last_name: last, dob, alias, address, height, weight, eyes, hair, status, notes, license_number: licenseNumber })'
-          text = text.replace(old, new, 1)
-
-          old = '<label>Alias<input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Optional" /></label>'
-          new = '<label>Alias<input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Optional" /></label><label>License Number<input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} placeholder="Optional OP-######" /></label>'
-          text = text.replace(old, new, 1)
-
+          text = text.replace(
+              'const [notes, setNotes] = useState(record.notes || "");',
+              'const [notes, setNotes] = useState(record.notes || "");\n  const [licenseNumber, setLicenseNumber] = useState(record.license_number || "");',
+              1,
+          )
+          text = text.replace(
+              'onSave({ first_name: first, last_name: last, dob, alias, address, height, weight, eyes, hair, status, notes })',
+              'onSave({ first_name: first, last_name: last, dob, alias, address, height, weight, eyes, hair, status, notes, license_number: licenseNumber })',
+              1,
+          )
+          text = text.replace(
+              '<label>Alias<input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Optional" /></label>',
+              '<label>Alias<input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Optional" /></label><label>License Number<input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} placeholder="Optional OP-######" /></label>',
+              1,
+          )
           page.write_text(text)
 
-          route = Path('app/api/records/route.ts')
+          route = Path("app/api/records/route.ts")
           text = route.read_text()
           old = '''      const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
@@ -60,7 +62,7 @@ jobs:
       const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number FROM people p WHERE p.id=${id}`);
       return NextResponse.json(updated.rows[0]);'''
           if old not in text:
-              raise SystemExit('Expected PUT block was not found')
+              raise SystemExit("Expected PUT block was not found")
           route.write_text(text.replace(old, new, 1))
 
       - name: Commit patch
@@ -68,15 +70,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/page.tsx app/api/records/route.ts
-          if git diff --cached --quiet; then
-            exit 0
-          fi
           git commit -m "Add license number to person editor"
-          git push
-
-      - name: Remove one-time workflow
-        if: success()
-        run: |
-          git rm .github/workflows/add-license-edit.yml
-          git commit -m "Remove one-time license edit workflow"
           git push
