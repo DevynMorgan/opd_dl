@@ -3,10 +3,12 @@ import { Pool, PoolClient } from "pg";
 let pool: Pool | undefined;
 
 function getDatabaseUrl() {
+  // Vercel/Supabase provides a pooled PostgreSQL URL for serverless requests.
+  // Prefer it for the OPD web app, then fall back to the direct connection.
   return (
-    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.POSTGRES_URL ||
     process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.SUPABASE_DB_URL ||
     process.env.SUPABASE_DATABASE_URL ||
     process.env.DATABASE_URL
@@ -37,92 +39,44 @@ export function db() {
 }
 
 async function createSchema(client: PoolClient) {
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v2'))");
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v3'))");
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS people (
-      id BIGSERIAL PRIMARY KEY,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      dob DATE,
-      alias TEXT,
-      address TEXT,
-      height TEXT,
-      weight TEXT,
-      eyes TEXT,
-      hair TEXT,
-      status TEXT NOT NULL DEFAULT 'ACTIVE',
-      notes TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id BIGSERIAL PRIMARY KEY, first_name TEXT NOT NULL, last_name TEXT NOT NULL, dob DATE,
+      alias TEXT, address TEXT, height TEXT, weight TEXT, eyes TEXT, hair TEXT,
+      status TEXT NOT NULL DEFAULT 'ACTIVE', notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS licenses (
-      id BIGSERIAL PRIMARY KEY,
-      person_id BIGINT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
-      license_number TEXT UNIQUE NOT NULL,
-      license_class TEXT DEFAULT 'C',
-      status TEXT NOT NULL DEFAULT 'VALID',
-      issue_date DATE,
-      expiration_date DATE,
-      restrictions TEXT,
-      notes TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id BIGSERIAL PRIMARY KEY, person_id BIGINT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      license_number TEXT UNIQUE NOT NULL, license_class TEXT DEFAULT 'C', status TEXT NOT NULL DEFAULT 'VALID',
+      issue_date DATE, expiration_date DATE, restrictions TEXT, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS vehicles (
-      id BIGSERIAL PRIMARY KEY,
-      person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
-      plate TEXT UNIQUE NOT NULL,
-      vin TEXT,
-      year INTEGER,
-      make TEXT,
-      model TEXT,
-      color TEXT,
-      registration_status TEXT NOT NULL DEFAULT 'ACTIVE',
-      notes TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id BIGSERIAL PRIMARY KEY, person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+      plate TEXT UNIQUE NOT NULL, vin TEXT, year INTEGER, make TEXT, model TEXT, color TEXT,
+      registration_status TEXT NOT NULL DEFAULT 'ACTIVE', notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS citations (
-      id BIGSERIAL PRIMARY KEY,
-      person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
-      citation_number TEXT UNIQUE NOT NULL,
-      charge TEXT NOT NULL,
-      location TEXT,
-      status TEXT NOT NULL DEFAULT 'OPEN',
-      issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      officer TEXT,
-      notes TEXT,
+      id BIGSERIAL PRIMARY KEY, person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+      citation_number TEXT UNIQUE NOT NULL, charge TEXT NOT NULL, location TEXT,
+      status TEXT NOT NULL DEFAULT 'OPEN', issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), officer TEXT, notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS warrants (
-      id BIGSERIAL PRIMARY KEY,
-      person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
-      warrant_number TEXT UNIQUE NOT NULL,
-      title TEXT NOT NULL,
-      priority TEXT NOT NULL DEFAULT 'STANDARD',
-      status TEXT NOT NULL DEFAULT 'ACTIVE',
-      issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      location TEXT,
-      officer TEXT,
-      notes TEXT,
+      id BIGSERIAL PRIMARY KEY, person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+      warrant_number TEXT UNIQUE NOT NULL, title TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'STANDARD',
+      status TEXT NOT NULL DEFAULT 'ACTIVE', issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), location TEXT, officer TEXT, notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS incidents (
-      id BIGSERIAL PRIMARY KEY,
-      incident_number TEXT UNIQUE NOT NULL,
-      title TEXT NOT NULL,
-      location TEXT,
-      status TEXT NOT NULL DEFAULT 'OPEN',
-      occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      officer TEXT,
-      notes TEXT,
+      id BIGSERIAL PRIMARY KEY, incident_number TEXT UNIQUE NOT NULL, title TEXT NOT NULL, location TEXT,
+      status TEXT NOT NULL DEFAULT 'OPEN', occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), officer TEXT, notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS messages (
-      id BIGSERIAL PRIMARY KEY,
-      subject TEXT NOT NULL,
-      body TEXT NOT NULL,
-      sender TEXT NOT NULL DEFAULT 'OPD ADMIN',
-      priority TEXT NOT NULL DEFAULT 'NORMAL',
-      read BOOLEAN NOT NULL DEFAULT FALSE,
+      id BIGSERIAL PRIMARY KEY, subject TEXT NOT NULL, body TEXT NOT NULL,
+      sender TEXT NOT NULL DEFAULT 'OPD ADMIN', priority TEXT NOT NULL DEFAULT 'NORMAL', read BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS people_name_idx ON people(last_name, first_name);
@@ -138,13 +92,13 @@ async function createSchema(client: PoolClient) {
   if (count.rows[0].count !== "0") return;
 
   const people = [
-    ["Bryce", "Fane", "1998-04-17", null, "", "5'7\"", "145", "Green", "Black", "ACTIVE", "Fictional RP record"],
-    ["Majken", "Blomqvist", "1992-03-14", null, "", "5'8\"", "150", "Blue", "Blonde", "ACTIVE", "Fictional RP record"],
-    ["Devyn", "Kitchi", "1995-06-22", null, "", "5'6\"", "135", "Hazel", "Brown", "ACTIVE", "Fictional RP record"],
-    ["Ryan", "Morrison", "1990-12-09", null, "", "6'0\"", "190", "Blue", "Brown", "ACTIVE", "Fictional RP record"],
-    ["Emilee", "Caldwell", "1996-06-27", null, "", "5'5\"", "130", "Brown", "Brown", "ACTIVE", "Fictional RP record"],
-    ["Emi", "Vale", "1996-11-02", null, "", "5'5\"", "128", "Hazel", "Brown", "ACTIVE", "Fictional RP record"],
-    ["Matt", "Holloway", "1994-08-21", null, "", "6'0\"", "185", "Blue", "Brown", "ACTIVE", "Fictional RP record"],
+    ["Bryce", "Fane", "1998-04-17", null, "", "5'7\"", "145", "Green", "Black", "ACTIVE", "RP record"],
+    ["Majken", "Blomqvist", "1992-03-14", null, "", "5'8\"", "150", "Blue", "Blonde", "ACTIVE", "RP record"],
+    ["Devyn", "Kitchi", "1995-06-22", null, "", "5'6\"", "135", "Hazel", "Brown", "ACTIVE", "RP record"],
+    ["Ryan", "Morrison", "1990-12-09", null, "", "6'0\"", "190", "Blue", "Brown", "ACTIVE", "RP record"],
+    ["Emilee", "Caldwell", "1996-06-27", null, "", "5'5\"", "130", "Brown", "Brown", "ACTIVE", "RP record"],
+    ["Emi", "Vale", "1996-11-02", null, "", "5'5\"", "128", "Hazel", "Brown", "ACTIVE", "RP record"],
+    ["Matt", "Holloway", "1994-08-21", null, "", "6'0\"", "185", "Blue", "Brown", "ACTIVE", "RP record"],
   ];
   const ids: number[] = [];
   for (const person of people) {
@@ -156,29 +110,29 @@ async function createSchema(client: PoolClient) {
   }
 
   await client.query(`INSERT INTO licenses (person_id,license_number,license_class,status,issue_date,expiration_date,restrictions,notes) VALUES
-    ($1::bigint,'OP-482917','C','VALID','2024-04-17','2029-04-17','None','Fictional RP record'),
-    ($2::bigint,'OP-318204','C','SUSPENDED','2023-11-02','2028-11-02','Corrective lenses','Fictional RP record'),
-    ($3::bigint,'OP-337221','C','VALID','2025-06-22','2030-06-22','None','Fictional RP record'),
-    ($4::bigint,'OP-7719','C','VALID','2022-12-09','2027-12-09','None','Fictional RP record'),
-    ($5::bigint,'OP-771493','C','VALID','2024-08-21','2029-08-21','None','Fictional RP record')`, [ids[0], ids[1], ids[2], ids[3], ids[6]]);
+    ($1::bigint,'OP-482917','C','VALID','2024-04-17','2029-04-17','None','RP record'),
+    ($2::bigint,'OP-318204','C','SUSPENDED','2023-11-02','2028-11-02','Corrective lenses','RP record'),
+    ($3::bigint,'OP-337221','C','VALID','2025-06-22','2030-06-22','None','RP record'),
+    ($4::bigint,'OP-7719','C','VALID','2022-12-09','2027-12-09','None','RP record'),
+    ($5::bigint,'OP-771493','C','VALID','2024-08-21','2029-08-21','None','RP record')`, [ids[0], ids[1], ids[2], ids[3], ids[6]]);
 
   await client.query(`INSERT INTO vehicles (person_id,plate,vin,year,make,model,color,registration_status,notes) VALUES
-    ($2::bigint,'OP-VALE','RP2019VALE0001',2019,'Black','Sedan','Black','ACTIVE','Fictional RP record'),
-    ($3::bigint,'OP-KIT2','RP2024KIT0001',2024,'Black','SUV','Black','ACTIVE','Fictional RP record'),
-    ($4::bigint,'OP-MORR','RP2020MOR0001',2020,'Gray','Pickup','Gray','ACTIVE','Fictional RP record'),
-    ($5::bigint,'OP-CALD','RP2018CAL0001',2018,'Red','Coupe','Red','ACTIVE','Fictional RP record'),
-    ($7::bigint,'OP-HOLL','RP2022HOL0001',2022,'Gray','Pickup','Gray','ACTIVE','Fictional RP record')`, ids);
+    ($2::bigint,'OP-VALE','RP2019VALE0001',2019,'Black','Sedan','Black','ACTIVE','RP record'),
+    ($3::bigint,'OP-KIT2','RP2024KIT0001',2024,'Black','SUV','Black','ACTIVE','RP record'),
+    ($4::bigint,'OP-MORR','RP2020MOR0001',2020,'Gray','Pickup','Gray','ACTIVE','RP record'),
+    ($5::bigint,'OP-CALD','RP2018CAL0001',2018,'Red','Coupe','Red','ACTIVE','RP record'),
+    ($7::bigint,'OP-HOLL','RP2022HOL0001',2022,'Gray','Pickup','Gray','ACTIVE','RP record')`, ids);
 
   await client.query(`INSERT INTO citations (person_id,citation_number,charge,location,status,issued_at,officer,notes) VALUES
-    ($4::bigint,'CIT-260901','Failure to obey traffic control','Opaline Ave','OPEN','2026-09-01 14:20:00','1027','Fictional RP record'),
-    ($5::bigint,'CIT-260884','Expired registration','North Ridge Rd','PAID','2026-08-28 10:15:00','1033','Fictional RP record')`, ids);
+    ($4::bigint,'CIT-260901','Failure to obey traffic control','Opaline Ave','OPEN','2026-09-01 14:20:00','1027','RP record'),
+    ($5::bigint,'CIT-260884','Expired registration','North Ridge Rd','PAID','2026-08-28 10:15:00','1033','RP record')`, ids);
 
   await client.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES
-    ($5::bigint,'W-260117','Failure to appear','STANDARD','ACTIVE','2026-09-02 09:00:00','Opaline County','1033','Fictional RP record')`, ids);
+    ($5::bigint,'W-260117','Failure to appear','STANDARD','ACTIVE','2026-09-02 09:00:00','Opaline County','1033','RP record')`, ids);
 
   await client.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes) VALUES
-    ('INC-260905-01','Missing Person Report','Opaline','OPEN','2026-09-05 06:15:00','1027','Fictional RP record'),
-    ('INC-260904-03','Vehicle Collision','Shattered Spine Rd','CLOSED','2026-09-04 22:11:00','1041','Fictional RP record')`);
+    ('INC-260905-01','Missing Person Report','Opaline','OPEN','2026-09-05 06:15:00','1027','RP record'),
+    ('INC-260904-03','Vehicle Collision','Shattered Spine Rd','CLOSED','2026-09-04 22:11:00','1041','RP record')`);
 
   await client.query(`INSERT INTO messages (subject,body,sender,priority) VALUES
     ('Records System Online','OPD records management system is connected to the persistent RP database.','OPD ADMIN','NORMAL'),
@@ -205,5 +159,3 @@ export async function ensureSchema() {
   });
   return schemaReady;
 }
-
-// Supabase database initialization and persistent record storage.
