@@ -51,8 +51,25 @@ export default function GenderEnhancer() {
       });
     };
 
-    addGenderField();
-    const observer = new MutationObserver(addGenderField);
+    const cleanDobDisplay = () => {
+      const fields = document.querySelectorAll<HTMLElement>(".modal-grid > div");
+      fields.forEach(field => {
+        const label = field.querySelector("small");
+        const value = field.querySelector("b");
+        if (label?.textContent?.trim() !== "DOB" || !value) return;
+
+        const match = value.textContent?.trim().match(/^(\d{4}-\d{2}-\d{2})(?:T.*)?$/);
+        if (match) value.textContent = match[1];
+      });
+    };
+
+    const enhance = () => {
+      addGenderField();
+      cleanDobDisplay();
+    };
+
+    enhance();
+    const observer = new MutationObserver(enhance);
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
