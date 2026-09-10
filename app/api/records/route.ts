@@ -137,3 +137,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Could not save record: ${detail}`, detail }, { status: 500 });
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    await ensureSchema();
+    const body = await request.json();
+    const type = clean(body.type);
+    const id = sqlNullableBigInt(body.id);
+    if (id === "NULL") return NextResponse.json({ error: "A valid record ID is required" }, { status: 400 });
+    const p = db();
+
+    if (type === "people") {
+      if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
+      const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
+      if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
+      return NextResponse.json(r.rows[0]);
+    }
+
+    return NextResponse.json({ error: "Editing is currently supported for person records." }, { status: 400 });
+  } catch (error) {
+    console.error(error);
+    const detail = error instanceof Error ? error.message : "Unknown database error";
+    return NextResponse.json({ error: `Could not update record: ${detail}`, detail }, { status: 500 });
+  }
+}
