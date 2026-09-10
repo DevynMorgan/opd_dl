@@ -43,6 +43,7 @@ export default function Home() {
   const [newLast, setNewLast] = useState("");
   const [newDob, setNewDob] = useState("");
   const [newLicense, setNewLicense] = useState("");
+  const [newGender, setNewGender] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
 
   const type = apiType[section] || "people";
@@ -84,7 +85,7 @@ export default function Home() {
     setSaveMessage("");
     const r = await fetch("/api/records", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "people", first_name: newFirst, last_name: newLast, dob: newDob || null, notes: "Fictional RP record." })
+      body: JSON.stringify({ type: "people", first_name: newFirst, last_name: newLast, dob: newDob || null, gender: newGender || null, notes: "Fictional RP record." })
     });
     const data = await r.json();
     if (!r.ok) { setSaveMessage(data.error || "Could not save record"); return; }
@@ -100,7 +101,7 @@ export default function Home() {
         return;
       }
     }
-    setShowNew(false); setNewFirst(""); setNewLast(""); setNewDob(""); setNewLicense("");
+    setShowNew(false); setNewFirst(""); setNewLast(""); setNewDob(""); setNewLicense(""); setNewGender("");
     setSection("People / Records"); setQuery(""); setSaveMessage("Record saved to the persistent RP database.");
     await loadRecords("people", "");
   }
@@ -132,8 +133,8 @@ export default function Home() {
     : ["ADMINISTRATION", "Manage fictional RP records and system data."];
 
   const headers: Record<string, string[]> = {
-    "Driver Licenses": ["NAME", "LICENSE", "DOB", "STATUS", "EXPIRES"],
-    "People / Records": ["NAME", "DOB", "LICENSE", "VEHICLE", "STATUS"],
+    "Driver Licenses": ["NAME", "LICENSE", "CLASS", "DOB", "STATUS", "EXPIRES"],
+    "People / Records": ["NAME", "DOB", "GENDER", "LICENSE", "VEHICLE", "STATUS"],
     Vehicles: ["PLATE", "VIN / RECORD ID", "REGISTERED OWNER", "VEHICLE", "STATUS"],
     Citations: ["CITATION", "NAME", "CHARGE", "STATUS", "DATE", "OFFICER"],
     Warrants: ["ID", "NAME", "PRIORITY", "STATUS", "ISSUED", "LOCATION"],
@@ -142,8 +143,8 @@ export default function Home() {
   };
 
   const rows = useMemo(() => {
-    if (section === "Driver Licenses") return records.map(r => [`${r.first_name} ${r.last_name}`, r.license_number, fmt(r.dob), r.status, fmt(r.expiration_date)]);
-    if (section === "People / Records") return records.map(r => [`${r.first_name} ${r.last_name}`, fmt(r.dob), r.license_number || "None", r.vehicle_label || "None", r.license_status || r.status]);
+    if (section === "Driver Licenses") return records.map(r => [`${r.first_name} ${r.last_name}`, r.license_number, r.license_class || "C", fmt(r.dob), r.status, fmt(r.expiration_date)]);
+    if (section === "People / Records") return records.map(r => [`${r.first_name} ${r.last_name}`, fmt(r.dob), r.gender || "—", r.license_number || "None", r.vehicle_label || "None", r.license_status || r.status]);
     if (section === "Vehicles") return records.map(r => [r.plate, r.vin || "", r.owner || "Unassigned", `${r.year || ""} ${r.color || ""} ${r.make || ""} ${r.model || ""}`.trim(), r.registration_status]);
     if (section === "Citations") return records.map(r => [r.citation_number, r.name || "Unknown", r.charge, r.status, fmt(r.issued_at), r.officer || "1027"]);
     if (section === "Warrants") return records.map(r => [r.warrant_number, r.name || "Unknown", r.priority, r.status, fmt(r.issued_at), r.location || ""]);
@@ -192,7 +193,7 @@ export default function Home() {
     <footer><span>OPALINE FIRST RESPONDERS&nbsp;&nbsp; | &nbsp;&nbsp; RECORDS MANAGEMENT SYSTEM</span><span>AUTHORIZED USE ONLY&nbsp;&nbsp; | &nbsp;&nbsp; FICTIONAL ROLEPLAY DATA</span></footer>
     {selected && <RecordModal record={selected} onClose={() => setSelected(null)} onEdit={() => setEditRecord(selected)} />}
     {editRecord && <EditPersonModal record={editRecord} onSave={values => updatePerson(editRecord, values)} onClose={() => setEditRecord(null)} />}
-    {showNew && <NewPersonModal first={newFirst} last={newLast} dob={newDob} license={newLicense} setFirst={setNewFirst} setLast={setNewLast} setDob={setNewDob} setLicense={setNewLicense} onSave={addPerson} onClose={() => setShowNew(false)} />}
+    {showNew && <NewPersonModal first={newFirst} last={newLast} dob={newDob} license={newLicense} gender={newGender} setFirst={setNewFirst} setLast={setNewLast} setDob={setNewDob} setLicense={setNewLicense} setGender={setNewGender} onSave={addPerson} onClose={() => setShowNew(false)} />}
   </main>;
 }
 
@@ -210,9 +211,11 @@ function EditPersonModal({ record, onSave, onClose }: { record: RecordRow; onSav
   const [first, setFirst] = useState(record.first_name || "");
   const [last, setLast] = useState(record.last_name || "");
   const [dob, setDob] = useState(record.dob ? String(record.dob).slice(0, 10) : "");
+  const [gender, setGender] = useState(record.gender || "");
   const [alias, setAlias] = useState(record.alias || "");
   const [address, setAddress] = useState(record.address || "");
   const [licenseNumber, setLicenseNumber] = useState(record.license_number || "");
+  const [licenseClass, setLicenseClass] = useState(record.license_class || "C");
   const [height, setHeight] = useState(record.height || "");
   const [weight, setWeight] = useState(record.weight || "");
   const [status, setStatus] = useState(record.status || "ACTIVE");
@@ -223,16 +226,16 @@ function EditPersonModal({ record, onSave, onClose }: { record: RecordRow; onSav
   async function save() {
     if (!first.trim() || !last.trim()) { setError("First and last name are required."); return; }
     setSaving(true); setError("");
-    const ok = await onSave({ first_name: first, last_name: last, dob, alias, address, license_number: licenseNumber, height, weight, status, notes });
+    const ok = await onSave({ first_name: first, last_name: last, dob, gender, alias, address, license_number: licenseNumber, license_class: licenseClass, height, weight, status, notes });
     if (!ok) setError("The record could not be updated.");
     setSaving(false);
   }
 
-  return <div className="modal-backdrop" onClick={onClose}><div className="record-modal new-record" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X /></button><div className="modal-head"><div className="modal-icon"><Pencil /></div><div><small>ADMIN / RECORD EDIT</small><h2>EDIT PERSON RECORD</h2><p>Update the existing database record. This does not create a duplicate.</p></div></div><div className="new-form"><label>First Name<input value={first} onChange={e => setFirst(e.target.value)} autoFocus /></label><label>Last Name<input value={last} onChange={e => setLast(e.target.value)} /></label><label>Date of Birth<input type="date" value={dob} onChange={e => setDob(e.target.value)} /></label><label>Alias<input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Optional" /></label><label>Address<input value={address} onChange={e => setAddress(e.target.value)} placeholder="Optional" /></label><label>License Number<input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} placeholder="Optional OP-######" /></label><label>Height<input value={height} onChange={e => setHeight(e.target.value)} placeholder="e.g. 5 FEET 8 INCHES" /></label><label>Weight<input value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 150" /></label><label>Status<select value={status} onChange={e => setStatus(e.target.value)}><option>ACTIVE</option><option>INACTIVE</option><option>DECEASED</option><option>UNKNOWN</option></select></label><label className="full-width">Notes<textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} /></label></div>{error && <div className="save-alert">{error}</div>}<div className="actions modal-actions"><button className="primary" onClick={save} disabled={saving}><Pencil />{saving ? "SAVING..." : "SAVE CHANGES"}</button><button onClick={onClose} disabled={saving}>CANCEL</button></div></div></div>;
+  return <div className="modal-backdrop" onClick={onClose}><div className="record-modal new-record" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X /></button><div className="modal-head"><div className="modal-icon"><Pencil /></div><div><small>ADMIN / RECORD EDIT</small><h2>EDIT PERSON RECORD</h2><p>Update the existing database record. This does not create a duplicate.</p></div></div><div className="new-form"><label>First Name<input value={first} onChange={e => setFirst(e.target.value)} autoFocus /></label><label>Last Name<input value={last} onChange={e => setLast(e.target.value)} /></label><label>Date of Birth<input type="date" value={dob} onChange={e => setDob(e.target.value)} /></label><label>Gender<select value={gender} onChange={e => setGender(e.target.value)}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option></select></label><label>Alias<input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Optional" /></label><label>Address<input value={address} onChange={e => setAddress(e.target.value)} placeholder="Optional" /></label><label>License Number<input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} placeholder="Optional OP-######" /></label><label>License Class<select value={licenseClass} onChange={e => setLicenseClass(e.target.value)}><option value="C">C</option><option value="A">A</option><option value="B">B</option><option value="M">M</option><option value="CDL">CDL</option><option value="D">D</option></select></label><label>Height<input value={height} onChange={e => setHeight(e.target.value)} placeholder="e.g. 5 FEET 8 INCHES" /></label><label>Weight<input value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 150" /></label><label>Status<select value={status} onChange={e => setStatus(e.target.value)}><option>ACTIVE</option><option>INACTIVE</option><option>DECEASED</option><option>UNKNOWN</option></select></label><label className="full-width">Notes<textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} /></label></div>{error && <div className="save-alert">{error}</div>}<div className="actions modal-actions"><button className="primary" onClick={save} disabled={saving}><Pencil />{saving ? "SAVING..." : "SAVE CHANGES"}</button><button onClick={onClose} disabled={saving}>CANCEL</button></div></div></div>;
 }
 
-function NewPersonModal({ first, last, dob, license, setFirst, setLast, setDob, setLicense, onSave, onClose }: { first: string; last: string; dob: string; license: string; setFirst: (v: string) => void; setLast: (v: string) => void; setDob: (v: string) => void; setLicense: (v: string) => void; onSave: () => void; onClose: () => void }) {
-  return <div className="modal-backdrop" onClick={onClose}><div className="record-modal new-record" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X /></button><div className="modal-head"><div className="modal-icon"><UserPlus /></div><div><small>ADMIN / RECORD CREATION</small><h2>NEW PERSON RECORD</h2><p>Create a fictional RP character and optionally assign a license.</p></div></div><div className="new-form"><label>First Name<input value={first} onChange={e => setFirst(e.target.value)} placeholder="First name" autoFocus /></label><label>Last Name<input value={last} onChange={e => setLast(e.target.value)} placeholder="Last name" /></label><label>Date of Birth<input value={dob} onChange={e => setDob(e.target.value)} placeholder="YYYY-MM-DD" /></label><label>License Number<input value={license} onChange={e => setLicense(e.target.value)} placeholder="Optional OP-######" /></label></div><div className="actions modal-actions"><button className="primary" onClick={onSave}><Plus />SAVE TO DATABASE</button><button onClick={onClose}>CANCEL</button></div></div></div>;
+function NewPersonModal({ first, last, dob, license, gender, setFirst, setLast, setDob, setLicense, setGender, onSave, onClose }: { first: string; last: string; dob: string; license: string; gender: string; setFirst: (v: string) => void; setLast: (v: string) => void; setDob: (v: string) => void; setLicense: (v: string) => void; setGender: (v: string) => void; onSave: () => void; onClose: () => void }) {
+  return <div className="modal-backdrop" onClick={onClose}><div className="record-modal new-record" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X /></button><div className="modal-head"><div className="modal-icon"><UserPlus /></div><div><small>ADMIN / RECORD CREATION</small><h2>NEW PERSON RECORD</h2><p>Create a fictional RP character and optionally assign a license.</p></div></div><div className="new-form"><label>First Name<input value={first} onChange={e => setFirst(e.target.value)} placeholder="First name" autoFocus /></label><label>Last Name<input value={last} onChange={e => setLast(e.target.value)} placeholder="Last name" /></label><label>Date of Birth<input value={dob} onChange={e => setDob(e.target.value)} placeholder="YYYY-MM-DD" /></label><label>Gender<select value={gender} onChange={e => setGender(e.target.value)}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option></select></label><label>License Number<input value={license} onChange={e => setLicense(e.target.value)} placeholder="Optional OP-######" /></label></div><div className="actions modal-actions"><button className="primary" onClick={onSave}><Plus />SAVE TO DATABASE</button><button onClick={onClose}>CANCEL</button></div></div></div>;
 }
 
 function ReportsPanel() {
