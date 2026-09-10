@@ -7,10 +7,6 @@ type Category = typeof categories[number];
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const isCategory = (value: string): value is Category => categories.includes(value as Category);
 
-// Use SQL literals for this API instead of PostgreSQL bind parameters.
-// This avoids the PgBouncer/Supabase prepared-statement issue that was
-// producing "could not determine data type of parameter $1" even when
-// explicit casts were present in the SQL.
 const sqlText = (value: unknown) => `'${clean(value).replace(/'/g, "''")}'`;
 const sqlNullableText = (value: unknown) => {
   const text = clean(value);
@@ -44,7 +40,6 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(Number(searchParams.get("limit") || 50), 1), 200);
     const p = db();
     if (!isCategory(type)) return NextResponse.json({ error: "Unknown record type" }, { status: 400 });
-
     const search = sqlText(q);
     const limitSql = String(Math.trunc(limit));
 
@@ -95,7 +90,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const type = clean(body.type);
     const p = db();
-
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
       const r = await p.query(`INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes) VALUES (${sqlText(body.first_name)},${sqlText(body.last_name)},${sqlNullableDate(body.dob)},${sqlNullableText(body.alias)},${sqlNullableText(body.address)},${sqlNullableText(body.height)},${sqlNullableText(body.weight)},${sqlNullableText(body.eyes)},${sqlNullableText(body.hair)},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableText(body.notes)}) RETURNING *`);
@@ -151,7 +145,21 @@ export async function PUT(request: NextRequest) {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
       const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
-      return NextResponse.json(r.rows[0]);
+
+      if (body.license_number !== undefined) {
+        const license = sqlNullableText(body.license_number);
+        const existing = await p.query(`SELECT id FROM licenses WHERE person_id=${id} ORDER BY id DESC LIMIT 1`);
+        if (license === "NULL") {
+          if (existing.rows.length) await p.query(`DELETE FROM licenses WHERE id=${existing.rows[0].id}`);
+        } else if (existing.rows.length) {
+          await p.query(`UPDATE licenses SET license_number=${license} WHERE id=${existing.rows[0].id}`);
+        } else {
+          await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${id},${license},'C','VALID','RP record')`);
+        }
+      }
+
+      const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number FROM people p WHERE p.id=${id}`);
+      return NextResponse.json(updated.rows[0]);
     }
 
     return NextResponse.json({ error: "Editing is currently supported for person records." }, { status: 400 });
