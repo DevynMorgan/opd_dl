@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, BarChart3, CalendarDays, Car, Clock3, Database, Eye,
-  FileText, History, IdCard, LogOut, Mail, Plus, RotateCcw, Search,
+  FileText, History, IdCard, LogOut, Mail, Pencil, Plus, RotateCcw, Search,
   Settings, Shield, UserPlus, UserRound, UsersRound, X
 } from "lucide-react";
 
@@ -38,6 +38,7 @@ export default function Home() {
   const [dob, setDob] = useState("");
   const [selected, setSelected] = useState<RecordRow | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [editRecord, setEditRecord] = useState<RecordRow | null>(null);
   const [newFirst, setNewFirst] = useState("");
   const [newLast, setNewLast] = useState("");
   const [newDob, setNewDob] = useState("");
@@ -88,14 +89,35 @@ export default function Home() {
     const data = await r.json();
     if (!r.ok) { setSaveMessage(data.error || "Could not save record"); return; }
     if (newLicense.trim()) {
-      await fetch("/api/records", {
+      const lr = await fetch("/api/records", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "licenses", person_id: data.id, license_number: newLicense, license_class: "C", status: "VALID", notes: "Fictional RP record." })
       });
+      if (!lr.ok) {
+        const licenseData = await lr.json().catch(() => ({}));
+        setSaveMessage(licenseData.error || "Person saved, but the license could not be saved.");
+        await loadRecords("people", "");
+        return;
+      }
     }
     setShowNew(false); setNewFirst(""); setNewLast(""); setNewDob(""); setNewLicense("");
     setSection("People / Records"); setQuery(""); setSaveMessage("Record saved to the persistent RP database.");
     await loadRecords("people", "");
+  }
+
+  async function updatePerson(record: RecordRow, values: Record<string, string>) {
+    setSaveMessage("");
+    const r = await fetch("/api/records", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "people", id: record.id, ...values })
+    });
+    const data = await r.json();
+    if (!r.ok) { setSaveMessage(data.error || "Could not update record"); return false; }
+    setEditRecord(null);
+    setSelected(data);
+    setSaveMessage("Record updated successfully.");
+    await loadRecords("people", query);
+    return true;
   }
 
   const heading = section === "Search" ? ["SEARCH RECORDS", "Search the persistent fictional records database."]
@@ -168,7 +190,8 @@ export default function Home() {
       <aside className="rightcol"><div className="scenic-card"><div className="scenic-overlay"><b>OPALINE</b><span>COMMUNITY · PEOPLE · HOME</span><i>Stronger Together.</i></div></div><div className="quick-card"><h2>QUICK LINKS</h2><button onClick={() => setShowNew(true)}><UserPlus />New Record</button><button onClick={() => setSection("Driver Licenses")}><IdCard />Scan ID / License</button><button onClick={() => setSection("Vehicles")}><Car />Vehicle Lookup</button><button onClick={() => setSection("Search")}><History />Recent Searches</button><button onClick={() => setSection("Warrants")}><AlertTriangle />BOLO / Alerts</button></div><div className="system-card"><h3>SYSTEM STATUS</h3><div className="status-row"><b><span className="online-dot" /> ONLINE</b><span>September 9, 2026</span></div><strong>DATABASE CONNECTED</strong><div className="system-footer">SERVICE&nbsp;&nbsp;•&nbsp;&nbsp; INTEGRITY&nbsp;&nbsp;•&nbsp;&nbsp; COMMUNITY</div></div></aside>
       </section></div>
     <footer><span>OPALINE FIRST RESPONDERS&nbsp;&nbsp; | &nbsp;&nbsp; RECORDS MANAGEMENT SYSTEM</span><span>AUTHORIZED USE ONLY&nbsp;&nbsp; | &nbsp;&nbsp; FICTIONAL ROLEPLAY DATA</span></footer>
-    {selected && <RecordModal record={selected} onClose={() => setSelected(null)} />}
+    {selected && <RecordModal record={selected} onClose={() => setSelected(null)} onEdit={() => setEditRecord(selected)} />}
+    {editRecord && <EditPersonModal record={editRecord} onSave={values => updatePerson(editRecord, values)} onClose={() => setEditRecord(null)} />}
     {showNew && <NewPersonModal first={newFirst} last={newLast} dob={newDob} license={newLicense} setFirst={setNewFirst} setLast={setNewLast} setDob={setNewDob} setLicense={setNewLicense} onSave={addPerson} onClose={() => setShowNew(false)} />}
   </main>;
 }
@@ -177,9 +200,36 @@ function RecordTable({ headers, rows, source, onSelect }: { headers: string[]; r
   return <div className="table-wrap"><table><thead><tr>{headers.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, i) => <tr key={i} onClick={() => source[i] && onSelect(source[i])}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>) : <tr><td colSpan={headers.length}>No matching fictional records.</td></tr>}</tbody></table></div>;
 }
 
-function RecordModal({ record, onClose }: { record: RecordRow; onClose: () => void }) {
+function RecordModal({ record, onClose, onEdit }: { record: RecordRow; onClose: () => void; onEdit: () => void }) {
   const name = record.first_name && record.last_name ? `${record.first_name} ${record.last_name}` : record.name || record.subject || record.title || record.license_number || record.plate || "Record";
-  return <div className="modal-backdrop" onClick={onClose}><div className="record-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X /></button><div className="modal-head"><div className="modal-icon"><Eye /></div><div><small>FICTIONAL RP RECORD</small><h2>{name}</h2><p>{record.license_number || record.plate || record.incident_number || record.citation_number || record.warrant_number || "OPD database record"}</p></div></div><div className="modal-grid">{Object.entries(record).filter(([k]) => !k.endsWith("_id") && !["created_at", "person_id", "id"].includes(k)).slice(0, 18).map(([key, value]) => <div key={key}><small>{key.replaceAll("_", " ").toUpperCase()}</small><b>{value === null || value === "" ? "—" : String(value)}</b></div>)}</div><button className="modal-action" onClick={onClose}>CLOSE RECORD</button></div></div>;
+  const canEditPerson = Boolean(record.id && record.first_name && record.last_name);
+  return <div className="modal-backdrop" onClick={onClose}><div className="record-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X /></button><div className="modal-head"><div className="modal-icon"><Eye /></div><div><small>FICTIONAL RP RECORD</small><h2>{name}</h2><p>{record.license_number || record.plate || record.incident_number || record.citation_number || record.warrant_number || "OPD database record"}</p></div></div><div className="modal-grid">{Object.entries(record).filter(([k]) => !k.endsWith("_id") && !["created_at", "person_id", "id"].includes(k)).slice(0, 18).map(([key, value]) => <div key={key}><small>{key.replaceAll("_", " ").toUpperCase()}</small><b>{value === null || value === "" ? "—" : String(value)}</b></div>)}</div><div className="actions modal-actions"><button className="primary" onClick={canEditPerson ? onEdit : onClose} disabled={!canEditPerson}><Pencil />EDIT RECORD</button><button onClick={onClose}>CLOSE RECORD</button></div></div></div>;
+}
+
+function EditPersonModal({ record, onSave, onClose }: { record: RecordRow; onSave: (values: Record<string, string>) => Promise<boolean>; onClose: () => void }) {
+  const [first, setFirst] = useState(record.first_name || "");
+  const [last, setLast] = useState(record.last_name || "");
+  const [dob, setDob] = useState(record.dob ? String(record.dob).slice(0, 10) : "");
+  const [alias, setAlias] = useState(record.alias || "");
+  const [address, setAddress] = useState(record.address || "");
+  const [height, setHeight] = useState(record.height || "");
+  const [weight, setWeight] = useState(record.weight || "");
+  const [eyes, setEyes] = useState(record.eyes || "");
+  const [hair, setHair] = useState(record.hair || "");
+  const [status, setStatus] = useState(record.status || "ACTIVE");
+  const [notes, setNotes] = useState(record.notes || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    if (!first.trim() || !last.trim()) { setError("First and last name are required."); return; }
+    setSaving(true); setError("");
+    const ok = await onSave({ first_name: first, last_name: last, dob, alias, address, height, weight, eyes, hair, status, notes });
+    if (!ok) setError("The record could not be updated.");
+    setSaving(false);
+  }
+
+  return <div className="modal-backdrop" onClick={onClose}><div className="record-modal new-record" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X /></button><div className="modal-head"><div className="modal-icon"><Pencil /></div><div><small>ADMIN / RECORD EDIT</small><h2>EDIT PERSON RECORD</h2><p>Update the existing database record. This does not create a duplicate.</p></div></div><div className="new-form"><label>First Name<input value={first} onChange={e => setFirst(e.target.value)} autoFocus /></label><label>Last Name<input value={last} onChange={e => setLast(e.target.value)} /></label><label>Date of Birth<input type="date" value={dob} onChange={e => setDob(e.target.value)} /></label><label>Alias<input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Optional" /></label><label>Address<input value={address} onChange={e => setAddress(e.target.value)} placeholder="Optional" /></label><label>Height<input value={height} onChange={e => setHeight(e.target.value)} placeholder="e.g. 5'10\"" /></label><label>Weight<input value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 165 lbs" /></label><label>Eyes<input value={eyes} onChange={e => setEyes(e.target.value)} /></label><label>Hair<input value={hair} onChange={e => setHair(e.target.value)} /></label><label>Status<select value={status} onChange={e => setStatus(e.target.value)}><option>ACTIVE</option><option>INACTIVE</option><option>DECEASED</option><option>UNKNOWN</option></select></label><label className="full-width">Notes<textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} /></label></div>{error && <div className="save-alert">{error}</div>}<div className="actions modal-actions"><button className="primary" onClick={save} disabled={saving}><Pencil />{saving ? "SAVING..." : "SAVE CHANGES"}</button><button onClick={onClose} disabled={saving}>CANCEL</button></div></div></div>;
 }
 
 function NewPersonModal({ first, last, dob, license, setFirst, setLast, setDob, setLicense, onSave, onClose }: { first: string; last: string; dob: string; license: string; setFirst: (v: string) => void; setLast: (v: string) => void; setDob: (v: string) => void; setLicense: (v: string) => void; onSave: () => void; onClose: () => void }) {
