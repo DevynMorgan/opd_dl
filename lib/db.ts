@@ -60,13 +60,14 @@ export function db() {
 }
 
 async function createSchema(client: PoolClient) {
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v5'))");
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v6'))");
   await client.query(`
     CREATE TABLE IF NOT EXISTS people (
       id BIGSERIAL PRIMARY KEY,
       first_name TEXT NOT NULL,
       last_name TEXT NOT NULL,
       dob DATE,
+      gender TEXT,
       alias TEXT,
       address TEXT,
       height TEXT,
@@ -77,6 +78,7 @@ async function createSchema(client: PoolClient) {
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE people ADD COLUMN IF NOT EXISTS gender TEXT;
     CREATE TABLE IF NOT EXISTS licenses (
       id BIGSERIAL PRIMARY KEY,
       person_id BIGINT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
