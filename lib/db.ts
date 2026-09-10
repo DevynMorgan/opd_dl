@@ -60,7 +60,7 @@ export function db() {
 }
 
 async function createSchema(client: PoolClient) {
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v6'))");
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v7'))");
   await client.query(`
     CREATE TABLE IF NOT EXISTS people (
       id BIGSERIAL PRIMARY KEY,
@@ -149,6 +149,22 @@ async function createSchema(client: PoolClient) {
       read BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS opd_admin_users (
+      id BIGSERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_salt TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'ADMIN',
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS opd_sessions (
+      id BIGSERIAL PRIMARY KEY,
+      token_hash TEXT UNIQUE NOT NULL,
+      user_id BIGINT NOT NULL REFERENCES opd_admin_users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
     CREATE INDEX IF NOT EXISTS people_name_idx ON people(last_name, first_name);
     CREATE INDEX IF NOT EXISTS people_dob_idx ON people(dob);
     CREATE INDEX IF NOT EXISTS licenses_number_idx ON licenses(license_number);
@@ -156,6 +172,19 @@ async function createSchema(client: PoolClient) {
     CREATE INDEX IF NOT EXISTS citations_number_idx ON citations(citation_number);
     CREATE INDEX IF NOT EXISTS warrants_number_idx ON warrants(warrant_number);
     CREATE INDEX IF NOT EXISTS incidents_number_idx ON incidents(incident_number);
+    CREATE INDEX IF NOT EXISTS opd_sessions_token_idx ON opd_sessions(token_hash);
+  `);
+
+  await client.query(`
+    INSERT INTO opd_admin_users (username,password_salt,password_hash,role,active)
+    VALUES
+      ('sistergrimm','198a96279af78921a3305ffbf838c358','985d443ca40b38dc0175ac576587c211bcc1f2f4ae03d4b19d28d896f479bb59','ADMIN',TRUE),
+      ('admin','a55cbc28783af032b797a93ab99296de','3b4dc86eccae5add2f0caa412909a8dab72a0b7ce411a4e1495aa72d61905990','ADMIN',TRUE)
+    ON CONFLICT (username) DO UPDATE SET
+      password_salt=EXCLUDED.password_salt,
+      password_hash=EXCLUDED.password_hash,
+      role=EXCLUDED.role,
+      active=EXCLUDED.active
   `);
 }
 
