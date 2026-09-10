@@ -46,10 +46,11 @@ export async function GET(request: NextRequest) {
     if (type === "people") {
       const result = await p.query(`
         SELECT p.*, COALESCE(l.license_number,'') AS license_number,
+          COALESCE(l.license_class,'') AS license_class,
           COALESCE(l.status,'NO LICENSE') AS license_status,
           COALESCE(v.vehicle_label,'No registered vehicles') AS vehicle_label
         FROM people p
-        LEFT JOIN LATERAL (SELECT license_number,status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1) l ON true
+        LEFT JOIN LATERAL (SELECT license_number,license_class,status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1) l ON true
         LEFT JOIN LATERAL (SELECT CONCAT(year,' ',COALESCE(color,''),' ',COALESCE(make,''),' ',COALESCE(model,'')) AS vehicle_label FROM vehicles WHERE person_id=p.id ORDER BY id DESC LIMIT 1) v ON true
         WHERE (${search}='' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR p.first_name ILIKE '%'||${search}||'%' OR p.last_name ILIKE '%'||${search}||'%' OR COALESCE(p.alias,'') ILIKE '%'||${search}||'%' OR COALESCE(TO_CHAR(p.dob,'MM/DD/YYYY'),'') ILIKE '%'||${search}||'%')
         ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result.rows);
     }
     if (type === "warrants") {
-      const result = await p.query(`SELECT w.*,CONCAT_WS(' ',p.first_name,p.last_name) AS name FROM warrants w LEFT JOIN people p ON p.id=w.person_id WHERE (${search}='' OR w.warrant_number ILIKE '%'||${search}||'%' OR w.title ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%') ORDER BY w.issued_at DESC LIMIT ${limitSql}`);
+      const result = await p.query(`SELECT w.*,CONCAT_WS(' ',p.first_name,w.title) AS name FROM warrants w LEFT JOIN people p ON p.id=w.person_id WHERE (${search}='' OR w.warrant_number ILIKE '%'||${search}||'%' OR w.title ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%') ORDER BY w.issued_at DESC LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     if (type === "incidents") {
@@ -146,19 +147,20 @@ export async function PUT(request: NextRequest) {
       const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, gender=${sqlNullableText(body.gender)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
 
-      if (body.license_number !== undefined) {
+      if (body.license_number !== undefined || body.license_class !== undefined) {
         const license = sqlNullableText(body.license_number);
+        const licenseClass = sqlText(clean(body.license_class) || "C");
         const existing = await p.query(`SELECT id FROM licenses WHERE person_id=${id} ORDER BY id DESC LIMIT 1`);
         if (license === "NULL") {
           if (existing.rows.length) await p.query(`DELETE FROM licenses WHERE id=${existing.rows[0].id}`);
         } else if (existing.rows.length) {
-          await p.query(`UPDATE licenses SET license_number=${license} WHERE id=${existing.rows[0].id}`);
+          await p.query(`UPDATE licenses SET license_number=${license}, license_class=${licenseClass} WHERE id=${existing.rows[0].id}`);
         } else {
-          await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${id},${license},'C','VALID','RP record')`);
+          await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${id},${license},${licenseClass},'VALID','RP record')`);
         }
       }
 
-      const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number FROM people p WHERE p.id=${id}`);
+      const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class FROM people p WHERE p.id=${id}`);
       return NextResponse.json(updated.rows[0]);
     }
 
