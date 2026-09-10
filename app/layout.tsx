@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./additional.css";
 import AuthGate from "./auth-gate";
+import LogoutHandler from "./logout-handler";
 
 export const metadata: Metadata = {
   title: "Opaline Police Department | Records Terminal",
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body><AuthGate>{children}</AuthGate></body>
+      <body><AuthGate><LogoutHandler />{children}</AuthGate></body>
     </html>
   );
 }
