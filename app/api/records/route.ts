@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const p = db();
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
-      const r = await p.query(`INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes) VALUES ($1::text,$2::text,$3::date,$4::text,$5::text,$6::text,$7::text,$8::text,$9::text,$10::text,$11::text) RETURNING *`, [clean(body.first_name),clean(body.last_name),body.dob||null,clean(body.alias),clean(body.address),clean(body.height),clean(body.weight),clean(body.eyes),clean(body.eyes),clean(body.hair),clean(body.status)||"ACTIVE",clean(body.notes)]);
+      const r = await p.query(`INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes) VALUES ($1::text,$2::text,$3::date,$4::text,$5::text,$6::text,$7::text,$8::text,$9::text,$10::text,$11::text) RETURNING *`, [clean(body.first_name),clean(body.last_name),body.dob||null,clean(body.alias),clean(body.address),clean(body.height),clean(body.weight),clean(body.eyes),clean(body.hair),clean(body.status)||"ACTIVE",clean(body.notes)]);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "licenses") {
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "warrants") {
-      const r = await p.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES ($1::bigint,$2::text,$3::text,$4::text,$5::text,$6::timestamptz,$7::text,$8::text,$9::text) RETURNING *`, [body.person_id?Number(body.person_id):null,clean(body.warrant_number),clean(body.warrant_number),clean(body.title),clean(body.priority)||"STANDARD",clean(body.status)||"ACTIVE",body.issued_at||new Date().toISOString(),clean(body.location),clean(body.officer)||"1027",clean(body.notes)]);
+      const r = await p.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES ($1::bigint,$2::text,$3::text,$4::text,$5::text,$6::timestamptz,$7::text,$8::text,$9::text) RETURNING *`, [body.person_id?Number(body.person_id):null,clean(body.warrant_number),clean(body.title),clean(body.priority)||"STANDARD",clean(body.status)||"ACTIVE",body.issued_at||new Date().toISOString(),clean(body.location),clean(body.officer)||"1027",clean(body.notes)]);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "incidents") {
