@@ -1,38 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "../../../lib/db";
+import { requireAdmin } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 const categories = ["people", "licenses", "vehicles", "citations", "warrants", "incidents", "messages"] as const;
 type Category = typeof categories[number];
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const isCategory = (value: string): value is Category => categories.includes(value as Category);
-
 const sqlText = (value: unknown) => `'${clean(value).replace(/'/g, "''")}'`;
-const sqlNullableText = (value: unknown) => {
-  const text = clean(value);
-  return text ? sqlText(text) : "NULL";
-};
-const sqlNullableDate = (value: unknown) => {
-  const text = clean(value);
-  return text ? `${sqlText(text)}::date` : "NULL";
-};
-const sqlNullableTimestamp = (value: unknown) => {
-  const text = clean(value);
-  return text ? `${sqlText(text)}::timestamptz` : "NULL";
-};
-const sqlNullableInteger = (value: unknown) => {
-  if (value === null || value === undefined || value === "") return "NULL";
-  const n = Number(value);
-  return Number.isFinite(n) ? String(Math.trunc(n)) : "NULL";
-};
-const sqlNullableBigInt = (value: unknown) => {
-  if (value === null || value === undefined || value === "") return "NULL";
-  const n = Number(value);
-  return Number.isSafeInteger(n) ? String(n) : "NULL";
-};
+const sqlNullableText = (value: unknown) => { const text = clean(value); return text ? sqlText(text) : "NULL"; };
+const sqlNullableDate = (value: unknown) => { const text = clean(value); return text ? `${sqlText(text)}::date` : "NULL"; };
+const sqlNullableTimestamp = (value: unknown) => { const text = clean(value); return text ? `${sqlText(text)}::timestamptz` : "NULL"; };
+const sqlNullableInteger = (value: unknown) => { if (value === null || value === undefined || value === "") return "NULL"; const n = Number(value); return Number.isFinite(n) ? String(Math.trunc(n)) : "NULL"; };
+const sqlNullableBigInt = (value: unknown) => { if (value === null || value === undefined || value === "") return "NULL"; const n = Number(value); return Number.isSafeInteger(n) ? String(n) : "NULL"; };
+const unauthorized = (error: unknown) => error instanceof Error && error.message === "UNAUTHORIZED";
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAdmin();
     await ensureSchema();
     const { searchParams } = new URL(request.url);
     const type = clean(searchParams.get("type") || "people");
@@ -42,18 +27,8 @@ export async function GET(request: NextRequest) {
     if (!isCategory(type)) return NextResponse.json({ error: "Unknown record type" }, { status: 400 });
     const search = sqlText(q);
     const limitSql = String(Math.trunc(limit));
-
     if (type === "people") {
-      const result = await p.query(`
-        SELECT p.*, COALESCE(l.license_number,'') AS license_number,
-          COALESCE(l.license_class,'') AS license_class,
-          COALESCE(l.status,'NO LICENSE') AS license_status,
-          COALESCE(v.vehicle_label,'No registered vehicles') AS vehicle_label
-        FROM people p
-        LEFT JOIN LATERAL (SELECT license_number,license_class,status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1) l ON true
-        LEFT JOIN LATERAL (SELECT CONCAT(year,' ',COALESCE(color,''),' ',COALESCE(make,''),' ',COALESCE(model,'')) AS vehicle_label FROM vehicles WHERE person_id=p.id ORDER BY id DESC LIMIT 1) v ON true
-        WHERE (${search}='' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR p.first_name ILIKE '%'||${search}||'%' OR p.last_name ILIKE '%'||${search}||'%' OR COALESCE(p.alias,'') ILIKE '%'||${search}||'%' OR COALESCE(TO_CHAR(p.dob,'MM/DD/YYYY'),'') ILIKE '%'||${search}||'%')
-        ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
+      const result = await p.query(`SELECT p.*, COALESCE(l.license_number,'') AS license_number, COALESCE(l.license_class,'') AS license_class, COALESCE(l.status,'NO LICENSE') AS license_status, COALESCE(v.vehicle_label,'No registered vehicles') AS vehicle_label FROM people p LEFT JOIN LATERAL (SELECT license_number,license_class,status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1) l ON true LEFT JOIN LATERAL (SELECT CONCAT(year,' ',COALESCE(color,''),' ',COALESCE(make,''),' ',COALESCE(model,'')) AS vehicle_label FROM vehicles WHERE person_id=p.id ORDER BY id DESC LIMIT 1) v ON true WHERE (${search}='' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR p.first_name ILIKE '%'||${search}||'%' OR p.last_name ILIKE '%'||${search}||'%' OR COALESCE(p.alias,'') ILIKE '%'||${search}||'%' OR COALESCE(TO_CHAR(p.dob,'MM/DD/YYYY'),'') ILIKE '%'||${search}||'%') ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     if (type === "licenses") {
@@ -79,6 +54,7 @@ export async function GET(request: NextRequest) {
     const result = await p.query(`SELECT * FROM messages WHERE (${search}='' OR subject ILIKE '%'||${search}||'%' OR body ILIKE '%'||${search}||'%') ORDER BY created_at DESC LIMIT ${limitSql}`);
     return NextResponse.json(result.rows);
   } catch (error) {
+    if (unauthorized(error)) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     console.error(error);
     const detail = error instanceof Error ? error.message : "Unknown database error";
     return NextResponse.json({ error: `Database request failed: ${detail}`, detail }, { status: 503 });
@@ -87,6 +63,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAdmin();
     await ensureSchema();
     const body = await request.json();
     const type = clean(body.type);
@@ -127,6 +104,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "Unknown record type" }, { status: 400 });
   } catch (error) {
+    if (unauthorized(error)) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     console.error(error);
     const detail = error instanceof Error ? error.message : "Unknown database error";
     return NextResponse.json({ error: `Could not save record: ${detail}`, detail }, { status: 500 });
@@ -135,18 +113,17 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireAdmin();
     await ensureSchema();
     const body = await request.json();
     const type = clean(body.type);
     const id = sqlNullableBigInt(body.id);
     if (id === "NULL") return NextResponse.json({ error: "A valid record ID is required" }, { status: 400 });
     const p = db();
-
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
       const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, gender=${sqlNullableText(body.gender)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
-
       if (body.license_number !== undefined || body.license_class !== undefined) {
         const license = sqlNullableText(body.license_number);
         const licenseClass = sqlText(clean(body.license_class) || "C");
@@ -154,18 +131,17 @@ export async function PUT(request: NextRequest) {
         if (license === "NULL") {
           if (existing.rows.length) await p.query(`DELETE FROM licenses WHERE id=${existing.rows[0].id}`);
         } else if (existing.rows.length) {
-          await p.query(`UPDATE licenses SET license_number=${license}, license_class=${licenseClass} WHERE id=${existing.rows[0].id}`);
+          await p.query(`UPDATE licenses SET license_number=${license},license_class=${licenseClass} WHERE id=${existing.rows[0].id}`);
         } else {
           await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${id},${license},${licenseClass},'VALID','RP record')`);
         }
       }
-
       const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class FROM people p WHERE p.id=${id}`);
       return NextResponse.json(updated.rows[0]);
     }
-
     return NextResponse.json({ error: "Editing is currently supported for person records." }, { status: 400 });
   } catch (error) {
+    if (unauthorized(error)) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     console.error(error);
     const detail = error instanceof Error ? error.message : "Unknown database error";
     return NextResponse.json({ error: `Could not update record: ${detail}`, detail }, { status: 500 });
