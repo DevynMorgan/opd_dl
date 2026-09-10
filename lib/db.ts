@@ -4,25 +4,11 @@ let queryPool: Pool | undefined;
 let schemaPool: Pool | undefined;
 
 function getQueryUrl() {
-  return (
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.DATABASE_URL ||
-    process.env.SUPABASE_DB_URL ||
-    process.env.SUPABASE_DATABASE_URL ||
-    process.env.POSTGRES_URL_NON_POOLING
-  );
+  return process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.SUPABASE_DATABASE_URL || process.env.POSTGRES_URL_NON_POOLING;
 }
 
 function getSchemaUrl() {
-  return (
-    process.env.POSTGRES_URL_NON_POOLING ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.DATABASE_URL ||
-    process.env.SUPABASE_DB_URL ||
-    process.env.SUPABASE_DATABASE_URL
-  );
+  return process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.SUPABASE_DATABASE_URL;
 }
 
 function normalizeConnectionString(connectionString: string) {
@@ -55,18 +41,14 @@ function makePool(connectionString: string, max: number) {
 
 function getQueryPool() {
   const connectionString = getQueryUrl();
-  if (!connectionString) {
-    throw new Error("No Supabase/Postgres database connection variable is configured in Vercel.");
-  }
+  if (!connectionString) throw new Error("No Supabase/Postgres database connection variable is configured in Vercel.");
   if (!queryPool) queryPool = makePool(connectionString, 5);
   return queryPool;
 }
 
 function getSchemaPool() {
   const connectionString = getSchemaUrl();
-  if (!connectionString) {
-    throw new Error("No Supabase/Postgres database connection variable is configured in Vercel.");
-  }
+  if (!connectionString) throw new Error("No Supabase/Postgres database connection variable is configured in Vercel.");
   if (!schemaPool) schemaPool = makePool(connectionString, 2);
   return schemaPool;
 }
@@ -78,8 +60,7 @@ export function db() {
 }
 
 async function createSchema(client: PoolClient) {
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v4'))");
-
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v5'))");
   await client.query(`
     CREATE TABLE IF NOT EXISTS people (
       id BIGSERIAL PRIMARY KEY,
@@ -174,64 +155,10 @@ async function createSchema(client: PoolClient) {
     CREATE INDEX IF NOT EXISTS warrants_number_idx ON warrants(warrant_number);
     CREATE INDEX IF NOT EXISTS incidents_number_idx ON incidents(incident_number);
   `);
-
-  const count = await client.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM people");
-  if (count.rows[0].count !== "0") return;
-
-  const people = [
-    ["Bryce", "Fane", "1998-04-17", null, "", "5'7\"", "145", "Green", "Black", "ACTIVE", "RP record"],
-    ["Majken", "Blomqvist", "1992-03-14", null, "", "5'8\"", "150", "Blue", "Blonde", "ACTIVE", "RP record"],
-    ["Devyn", "Kitchi", "1995-06-22", null, "", "5'6\"", "135", "Hazel", "Brown", "ACTIVE", "RP record"],
-    ["Ryan", "Morrison", "1990-12-09", null, "", "6'0\"", "190", "Blue", "Brown", "ACTIVE", "RP record"],
-    ["Emilee", "Caldwell", "1996-06-27", null, "", "5'5\"", "130", "Brown", "Brown", "ACTIVE", "RP record"],
-    ["Emi", "Vale", "1996-11-02", null, "", "5'5\"", "128", "Hazel", "Brown", "ACTIVE", "RP record"],
-    ["Matt", "Holloway", "1994-08-21", null, "", "6'0\"", "185", "Blue", "Brown", "ACTIVE", "RP record"],
-  ];
-
-  const ids: number[] = [];
-  for (const person of people) {
-    const r = await client.query<{ id: number }>(
-      `INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes)
-       VALUES ($1::text,$2::text,$3::date,$4::text,$5::text,$6::text,$7::text,$8::text,$9::text,$10::text,$11::text)
-       RETURNING id`,
-      person,
-    );
-    ids.push(r.rows[0].id);
-  }
-
-  await client.query(`INSERT INTO licenses (person_id,license_number,license_class,status,issue_date,expiration_date,restrictions,notes) VALUES
-    ($1::bigint,'OP-482917','C','VALID','2024-04-17','2029-04-17','None','RP record'),
-    ($2::bigint,'OP-318204','C','SUSPENDED','2023-11-02','2028-11-02','Corrective lenses','RP record'),
-    ($3::bigint,'OP-337221','C','VALID','2025-06-22','2030-06-22','None','RP record'),
-    ($4::bigint,'OP-7719','C','VALID','2022-12-09','2027-12-09','None','RP record'),
-    ($5::bigint,'OP-771493','C','VALID','2024-08-21','2029-08-21','None','RP record')`, [ids[0], ids[1], ids[2], ids[3], ids[6]]);
-
-  await client.query(`INSERT INTO vehicles (person_id,plate,vin,year,make,model,color,registration_status,notes) VALUES
-    ($2::bigint,'OP-VALE','RP2019VALE0001',2019,'Black','Sedan','Black','ACTIVE','RP record'),
-    ($3::bigint,'OP-KIT2','RP2024KIT0001',2024,'Black','SUV','Black','ACTIVE','RP record'),
-    ($4::bigint,'OP-MORR','RP2020MOR0001',2020,'Gray','Pickup','Gray','ACTIVE','RP record'),
-    ($5::bigint,'OP-CALD','RP2018CAL0001',2018,'Red','Coupe','Red','ACTIVE','RP record'),
-    ($7::bigint,'OP-HOLL','RP2022HOL0001',2022,'Gray','Pickup','Gray','ACTIVE','RP record')`, ids);
-
-  await client.query(`INSERT INTO citations (person_id,citation_number,charge,location,status,issued_at,officer,notes) VALUES
-    ($4::bigint,'CIT-260901','Failure to obey traffic control','Opaline Ave','OPEN','2026-09-01 14:20:00','1027','RP record'),
-    ($5::bigint,'CIT-260884','Expired registration','North Ridge Rd','PAID','2026-08-28 10:15:00','1033','RP record')`, ids);
-
-  await client.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES
-    ($5::bigint,'W-260117','Failure to appear','STANDARD','ACTIVE','2026-09-02 09:00:00','Opaline County','1033','RP record')`, ids);
-
-  await client.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes) VALUES
-    ('INC-260905-01','Missing Person Report','Opaline','OPEN','2026-09-05 06:15:00','1027','RP record'),
-    ('INC-260904-03','Vehicle Collision','Shattered Spine Rd','CLOSED','2026-09-04 22:11:00','1041','RP record')`);
-
-  await client.query(`INSERT INTO messages (subject,body,sender,priority) VALUES
-    ('Records System Online','OPD records management system is connected to the persistent RP database.','OPD ADMIN','NORMAL'),
-    ('Data Notice','The records in this system are roleplay data.','OPD ADMIN','HIGH')`);
 }
 
 export async function ensureSchema() {
   if (schemaReady) return schemaReady;
-
   schemaReady = (async () => {
     const client = await getSchemaPool().connect();
     try {
@@ -248,6 +175,5 @@ export async function ensureSchema() {
     schemaReady = null;
     throw error;
   });
-
   return schemaReady;
 }
