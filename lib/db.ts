@@ -220,3 +220,5 @@ export async function ensureSchema() {
 
   return schemaReady;
 }
+
+// Deployment trigger: Supabase connection and seed fixes are ready for Vercel.
