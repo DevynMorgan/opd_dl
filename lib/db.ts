@@ -25,9 +25,27 @@ function getSchemaUrl() {
   );
 }
 
+function normalizeConnectionString(connectionString: string) {
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("sslrootcert");
+    url.searchParams.delete("sslcert");
+    url.searchParams.delete("sslkey");
+    return url.toString();
+  } catch {
+    return connectionString
+      .replace(/([?&])sslmode=[^&]*&?/gi, "$1")
+      .replace(/([?&])sslrootcert=[^&]*&?/gi, "$1")
+      .replace(/([?&])sslcert=[^&]*&?/gi, "$1")
+      .replace(/([?&])sslkey=[^&]*&?/gi, "$1")
+      .replace(/[?&]$/g, "");
+  }
+}
+
 function makePool(connectionString: string, max: number) {
   return new Pool({
-    connectionString,
+    connectionString: normalizeConnectionString(connectionString),
     ssl: { rejectUnauthorized: false },
     max,
     idleTimeoutMillis: 10000,
