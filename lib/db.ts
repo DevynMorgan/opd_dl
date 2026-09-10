@@ -3,9 +3,6 @@ import { Pool, PoolClient } from "pg";
 let pool: Pool | undefined;
 
 function getDatabaseUrl() {
-  // Supabase's Vercel integration provides both pooled and non-pooled
-  // PostgreSQL URLs. Use the direct/non-pooled URL first because this app
-  // initializes its schema inside a transaction and writes persistent data.
   return (
     process.env.POSTGRES_URL_NON_POOLING ||
     process.env.POSTGRES_URL ||
@@ -40,7 +37,7 @@ export function db() {
 }
 
 async function createSchema(client: PoolClient) {
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v1'))");
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v2'))");
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS people (
@@ -58,7 +55,6 @@ async function createSchema(client: PoolClient) {
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS licenses (
       id BIGSERIAL PRIMARY KEY,
       person_id BIGINT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
@@ -71,7 +67,6 @@ async function createSchema(client: PoolClient) {
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS vehicles (
       id BIGSERIAL PRIMARY KEY,
       person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
@@ -85,7 +80,6 @@ async function createSchema(client: PoolClient) {
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS citations (
       id BIGSERIAL PRIMARY KEY,
       person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
@@ -98,7 +92,6 @@ async function createSchema(client: PoolClient) {
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS warrants (
       id BIGSERIAL PRIMARY KEY,
       person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
@@ -112,7 +105,6 @@ async function createSchema(client: PoolClient) {
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS incidents (
       id BIGSERIAL PRIMARY KEY,
       incident_number TEXT UNIQUE NOT NULL,
@@ -124,7 +116,6 @@ async function createSchema(client: PoolClient) {
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE TABLE IF NOT EXISTS messages (
       id BIGSERIAL PRIMARY KEY,
       subject TEXT NOT NULL,
@@ -134,7 +125,6 @@ async function createSchema(client: PoolClient) {
       read BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
     CREATE INDEX IF NOT EXISTS people_name_idx ON people(last_name, first_name);
     CREATE INDEX IF NOT EXISTS people_dob_idx ON people(dob);
     CREATE INDEX IF NOT EXISTS licenses_number_idx ON licenses(license_number);
@@ -156,15 +146,12 @@ async function createSchema(client: PoolClient) {
     ["Emi", "Vale", "1996-11-02", null, "", "5'5\"", "128", "Hazel", "Brown", "ACTIVE", "Fictional RP record"],
     ["Matt", "Holloway", "1994-08-21", null, "", "6'0\"", "185", "Blue", "Brown", "ACTIVE", "Fictional RP record"],
   ];
-
   const ids: number[] = [];
   for (const person of people) {
     const r = await client.query<{ id: number }>(
       `INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes)
        VALUES ($1::text,$2::text,$3::date,$4::text,$5::text,$6::text,$7::text,$8::text,$9::text,$10::text,$11::text)
-       RETURNING id`,
-      person,
-    );
+       RETURNING id`, person);
     ids.push(r.rows[0].id);
   }
 
@@ -195,12 +182,11 @@ async function createSchema(client: PoolClient) {
 
   await client.query(`INSERT INTO messages (subject,body,sender,priority) VALUES
     ('Records System Online','OPD records management system is connected to the persistent RP database.','OPD ADMIN','NORMAL'),
-    ('Fictional Data Notice','All records in this system are fictional roleplay data and are not real-world identity records.','OPD ADMIN','HIGH')`);
+    ('Data Notice','The records in this system are roleplay data.','OPD ADMIN','HIGH')`);
 }
 
 export async function ensureSchema() {
   if (schemaReady) return schemaReady;
-
   schemaReady = (async () => {
     const client = await getPool().connect();
     try {
@@ -217,8 +203,7 @@ export async function ensureSchema() {
     schemaReady = null;
     throw error;
   });
-
   return schemaReady;
 }
 
-// Deployment trigger: Supabase connection and seed fixes are ready for Vercel.
+// Supabase database initialization and persistent record storage.
