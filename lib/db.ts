@@ -1,82 +1,151 @@
 import { Pool, PoolClient } from "pg";
 
-let pool: Pool | undefined;
+let queryPool: Pool | undefined;
+let schemaPool: Pool | undefined;
 
-function getDatabaseUrl() {
-  // Vercel/Supabase provides a pooled PostgreSQL URL for serverless requests.
-  // Prefer it for the OPD web app, then fall back to the direct connection.
+function getQueryUrl() {
   return (
     process.env.POSTGRES_URL ||
     process.env.POSTGRES_PRISMA_URL ||
-    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.DATABASE_URL ||
     process.env.SUPABASE_DB_URL ||
     process.env.SUPABASE_DATABASE_URL ||
-    process.env.DATABASE_URL
+    process.env.POSTGRES_URL_NON_POOLING
   );
 }
 
-function getPool() {
-  const connectionString = getDatabaseUrl();
+function getSchemaUrl() {
+  return (
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.DATABASE_URL ||
+    process.env.SUPABASE_DB_URL ||
+    process.env.SUPABASE_DATABASE_URL
+  );
+}
+
+function makePool(connectionString: string, max: number) {
+  return new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    max,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 10000,
+  });
+}
+
+function getQueryPool() {
+  const connectionString = getQueryUrl();
   if (!connectionString) {
     throw new Error("No Supabase/Postgres database connection variable is configured in Vercel.");
   }
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      max: 5,
-      idleTimeoutMillis: 10000,
-      connectionTimeoutMillis: 10000,
-    });
+  if (!queryPool) queryPool = makePool(connectionString, 5);
+  return queryPool;
+}
+
+function getSchemaPool() {
+  const connectionString = getSchemaUrl();
+  if (!connectionString) {
+    throw new Error("No Supabase/Postgres database connection variable is configured in Vercel.");
   }
-  return pool;
+  if (!schemaPool) schemaPool = makePool(connectionString, 2);
+  return schemaPool;
 }
 
 let schemaReady: Promise<void> | null = null;
 
 export function db() {
-  return getPool();
+  return getQueryPool();
 }
 
 async function createSchema(client: PoolClient) {
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v3'))");
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('opd_dl_schema_v4'))");
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS people (
-      id BIGSERIAL PRIMARY KEY, first_name TEXT NOT NULL, last_name TEXT NOT NULL, dob DATE,
-      alias TEXT, address TEXT, height TEXT, weight TEXT, eyes TEXT, hair TEXT,
-      status TEXT NOT NULL DEFAULT 'ACTIVE', notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id BIGSERIAL PRIMARY KEY,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      dob DATE,
+      alias TEXT,
+      address TEXT,
+      height TEXT,
+      weight TEXT,
+      eyes TEXT,
+      hair TEXT,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS licenses (
-      id BIGSERIAL PRIMARY KEY, person_id BIGINT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
-      license_number TEXT UNIQUE NOT NULL, license_class TEXT DEFAULT 'C', status TEXT NOT NULL DEFAULT 'VALID',
-      issue_date DATE, expiration_date DATE, restrictions TEXT, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id BIGSERIAL PRIMARY KEY,
+      person_id BIGINT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      license_number TEXT UNIQUE NOT NULL,
+      license_class TEXT DEFAULT 'C',
+      status TEXT NOT NULL DEFAULT 'VALID',
+      issue_date DATE,
+      expiration_date DATE,
+      restrictions TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS vehicles (
-      id BIGSERIAL PRIMARY KEY, person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
-      plate TEXT UNIQUE NOT NULL, vin TEXT, year INTEGER, make TEXT, model TEXT, color TEXT,
-      registration_status TEXT NOT NULL DEFAULT 'ACTIVE', notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id BIGSERIAL PRIMARY KEY,
+      person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+      plate TEXT UNIQUE NOT NULL,
+      vin TEXT,
+      year INTEGER,
+      make TEXT,
+      model TEXT,
+      color TEXT,
+      registration_status TEXT NOT NULL DEFAULT 'ACTIVE',
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS citations (
-      id BIGSERIAL PRIMARY KEY, person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
-      citation_number TEXT UNIQUE NOT NULL, charge TEXT NOT NULL, location TEXT,
-      status TEXT NOT NULL DEFAULT 'OPEN', issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), officer TEXT, notes TEXT,
+      id BIGSERIAL PRIMARY KEY,
+      person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+      citation_number TEXT UNIQUE NOT NULL,
+      charge TEXT NOT NULL,
+      location TEXT,
+      status TEXT NOT NULL DEFAULT 'OPEN',
+      issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      officer TEXT,
+      notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS warrants (
-      id BIGSERIAL PRIMARY KEY, person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
-      warrant_number TEXT UNIQUE NOT NULL, title TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'STANDARD',
-      status TEXT NOT NULL DEFAULT 'ACTIVE', issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), location TEXT, officer TEXT, notes TEXT,
+      id BIGSERIAL PRIMARY KEY,
+      person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+      warrant_number TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      priority TEXT NOT NULL DEFAULT 'STANDARD',
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      location TEXT,
+      officer TEXT,
+      notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS incidents (
-      id BIGSERIAL PRIMARY KEY, incident_number TEXT UNIQUE NOT NULL, title TEXT NOT NULL, location TEXT,
-      status TEXT NOT NULL DEFAULT 'OPEN', occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), officer TEXT, notes TEXT,
+      id BIGSERIAL PRIMARY KEY,
+      incident_number TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      location TEXT,
+      status TEXT NOT NULL DEFAULT 'OPEN',
+      occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      officer TEXT,
+      notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS messages (
-      id BIGSERIAL PRIMARY KEY, subject TEXT NOT NULL, body TEXT NOT NULL,
-      sender TEXT NOT NULL DEFAULT 'OPD ADMIN', priority TEXT NOT NULL DEFAULT 'NORMAL', read BOOLEAN NOT NULL DEFAULT FALSE,
+      id BIGSERIAL PRIMARY KEY,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      sender TEXT NOT NULL DEFAULT 'OPD ADMIN',
+      priority TEXT NOT NULL DEFAULT 'NORMAL',
+      read BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS people_name_idx ON people(last_name, first_name);
@@ -100,12 +169,15 @@ async function createSchema(client: PoolClient) {
     ["Emi", "Vale", "1996-11-02", null, "", "5'5\"", "128", "Hazel", "Brown", "ACTIVE", "RP record"],
     ["Matt", "Holloway", "1994-08-21", null, "", "6'0\"", "185", "Blue", "Brown", "ACTIVE", "RP record"],
   ];
+
   const ids: number[] = [];
   for (const person of people) {
     const r = await client.query<{ id: number }>(
       `INSERT INTO people (first_name,last_name,dob,alias,address,height,weight,eyes,hair,status,notes)
        VALUES ($1::text,$2::text,$3::date,$4::text,$5::text,$6::text,$7::text,$8::text,$9::text,$10::text,$11::text)
-       RETURNING id`, person);
+       RETURNING id`,
+      person,
+    );
     ids.push(r.rows[0].id);
   }
 
@@ -141,8 +213,9 @@ async function createSchema(client: PoolClient) {
 
 export async function ensureSchema() {
   if (schemaReady) return schemaReady;
+
   schemaReady = (async () => {
-    const client = await getPool().connect();
+    const client = await getSchemaPool().connect();
     try {
       await client.query("BEGIN");
       await createSchema(client);
@@ -157,5 +230,6 @@ export async function ensureSchema() {
     schemaReady = null;
     throw error;
   });
+
   return schemaReady;
 }
