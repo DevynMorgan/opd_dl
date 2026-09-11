@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "../../../lib/db";
-import { requireAdmin } from "../../../lib/auth";
+import { getCurrentUser, requireAdmin } from "../../../lib/auth";
 import { officerIdentity } from "../../../lib/officer-identity";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,8 @@ const nullableBigInt = (value: unknown) => { const n = Number(value); return Num
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAdmin();
+    const user = await getCurrentUser();
+    if (!user) throw new Error("UNAUTHORIZED");
     await ensureSchema();
     const body = await request.json();
     const p = db();
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result.rows[0], { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "UNAUTHORIZED") return NextResponse.json({ error: "Administrator access required." }, { status: 403 });
+    if (error instanceof Error && error.message === "UNAUTHORIZED") return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     console.error(error);
     const detail = error instanceof Error ? error.message : "Unknown database error";
     return NextResponse.json({ error: `Could not create warrant: ${detail}` }, { status: 500 });
