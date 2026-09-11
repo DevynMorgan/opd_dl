@@ -10,7 +10,7 @@ const isCategory = (value: string): value is Category => categories.includes(val
 const sqlText = (value: unknown) => `'${clean(value).replace(/'/g, "''")}'`;
 const sqlNullableText = (value: unknown) => { const text = clean(value); return text ? sqlText(text) : "NULL"; };
 const sqlNullableDate = (value: unknown) => { const text = clean(value); return text ? `${sqlText(text)}::date` : "NULL"; };
-const sqlNullableTimestamp = (value: unknown) => { const text = clean(value); return text ? `${sqlText(text)}::timestamptz` : "NULL" : "NULL"; };
+const sqlNullableTimestamp = (value: unknown) => { const text = clean(value); return text ? `${sqlText(text)}::timestamptz` : "NULL"; };
 const sqlNullableBigInt = (value: unknown) => { if (value === null || value === undefined || value === "") return "NULL"; const n = Number(value); return Number.isSafeInteger(n) ? String(n) : "NULL"; };
 const unauthorized = (error: unknown) => error instanceof Error && error.message === "UNAUTHORIZED";
 
