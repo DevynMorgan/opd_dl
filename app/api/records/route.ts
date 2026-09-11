@@ -105,21 +105,33 @@ export async function PUT(request: NextRequest) {
     const p = db();
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
-      const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, gender=${sqlNullableText(body.gender)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${id} RETURNING *`);
+
+      // Driver License rows carry the license ID in `id`, while People rows carry the person ID.
+      // Resolve a license row back to its owning person before updating so Edit works from either view.
+      let personId = id;
+      const personCheck = await p.query(`SELECT id FROM people WHERE id=${id} LIMIT 1`);
+      if (!personCheck.rows.length) {
+        const licenseOwner = await p.query(`SELECT person_id FROM licenses WHERE id=${id} LIMIT 1`);
+        if (licenseOwner.rows.length && licenseOwner.rows[0].person_id !== null) {
+          personId = String(licenseOwner.rows[0].person_id);
+        }
+      }
+
+      const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, gender=${sqlNullableText(body.gender)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${personId} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
       if (body.license_number !== undefined || body.license_class !== undefined) {
         const license = sqlNullableText(body.license_number);
         const licenseClass = sqlText(clean(body.license_class) || "C");
-        const existing = await p.query(`SELECT id FROM licenses WHERE person_id=${id} ORDER BY id DESC LIMIT 1`);
+        const existing = await p.query(`SELECT id FROM licenses WHERE person_id=${personId} ORDER BY id DESC LIMIT 1`);
         if (license === "NULL") {
           if (existing.rows.length) await p.query(`DELETE FROM licenses WHERE id=${existing.rows[0].id}`);
         } else if (existing.rows.length) {
           await p.query(`UPDATE licenses SET license_number=${license},license_class=${licenseClass} WHERE id=${existing.rows[0].id}`);
         } else {
-          await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${id},${license},${licenseClass},'VALID','RP record')`);
+          await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${personId},${license},${licenseClass},'VALID','RP record')`);
         }
       }
-      const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class FROM people p WHERE p.id=${id}`);
+      const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class FROM people p WHERE p.id=${personId}`);
       return NextResponse.json(updated.rows[0]);
     }
     return NextResponse.json({ error: "Editing is currently supported for person records." }, { status: 400 });
