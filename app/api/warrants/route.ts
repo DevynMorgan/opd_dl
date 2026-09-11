@@ -35,26 +35,31 @@ export async function POST(request: NextRequest) {
 
     const issuedAt = clean(body.issued_at) ? body.issued_at : new Date().toISOString();
     const year = new Date(issuedAt).getFullYear();
-    await p.query("SELECT pg_advisory_xact_lock(hashtext('opd_warrant_number'))");
-    const next = await p.query(`SELECT COALESCE(MAX(CASE WHEN warrant_number ~ '^W-${year}-[0-9]+$' THEN CAST(SUBSTRING(warrant_number FROM 9) AS INTEGER) ELSE 0 END),0)+1 AS next_number, COALESCE(MAX(CASE WHEN warrant_number ~ '^W-${year}-[0-9]+$' THEN LENGTH(SUBSTRING(warrant_number FROM 9)) ELSE 3 END),3) AS number_width FROM warrants`);
-    const nextNumber = Number(next.rows[0].next_number);
-    const numberWidth = Math.max(3, Number(next.rows[0].number_width));
-    const warrantNumber = `W-${year}-${String(nextNumber).padStart(numberWidth, "0")}`;
     const officer = officerIdentity(user.username);
     const personId = nullableBigInt(body.person_id);
+    const client = await p.connect();
+    try {
+      await client.query("SELECT pg_advisory_lock(hashtext('opd_warrant_number'))");
+      const next = await client.query(`SELECT COALESCE(MAX(CASE WHEN warrant_number ~ '^W-${year}-[0-9]+$' THEN CAST(SUBSTRING(warrant_number FROM 9) AS INTEGER) ELSE 0 END),0)+1 AS next_number, COALESCE(MAX(CASE WHEN warrant_number ~ '^W-${year}-[0-9]+$' THEN LENGTH(SUBSTRING(warrant_number FROM 9)) ELSE 3 END),3) AS number_width FROM warrants`);
+      const nextNumber = Number(next.rows[0].next_number);
+      const numberWidth = Math.max(3, Number(next.rows[0].number_width));
+      const warrantNumber = `W-${year}-${String(nextNumber).padStart(numberWidth, "0")}`;
 
-    const result = await p.query(`
-      INSERT INTO warrants (
-        person_id,warrant_number,title,priority,status,issued_at,location,officer,notes,
-        warrant_type,charge,expiration_date,bond,case_number,issuing_authority
-      ) VALUES (
-        ${personId},${text(warrantNumber)},${text(title)},${text(clean(body.priority) || "STANDARD")},
-        ${text(clean(body.status) || "ACTIVE")},${nullableTimestamp(issuedAt)},${nullableText(body.location)},${text(officer)},${nullableText(body.notes)},
-        ${nullableText(body.warrant_type)},${text(charge || title)},${nullableDate(body.expiration_date)},${nullableText(body.bond)},${nullableText(body.case_number)},${nullableText(body.issuing_authority)}
-      ) RETURNING *
-    `);
+      const result = await client.query(`
+        INSERT INTO warrants (
+          person_id,warrant_number,title,priority,status,issued_at,location,officer,notes,
+          warrant_type,charge,expiration_date,bond,case_number,issuing_authority
+        ) VALUES (
+          ${personId},${text(warrantNumber)},${text(title)},${text(clean(body.priority) || "STANDARD")},
+          ${text(clean(body.status) || "ACTIVE")},${nullableTimestamp(issuedAt)},${nullableText(body.location)},${text(officer)},${nullableText(body.notes)},
+          ${nullableText(body.warrant_type)},${text(charge || title)},${nullableDate(body.expiration_date)},${nullableText(body.bond)},${nullableText(body.case_number)},${nullableText(body.issuing_authority)}
+        ) RETURNING *
+      `);
 
-    return NextResponse.json(result.rows[0], { status: 201 });
+      return NextResponse.json(result.rows[0], { status: 201 });
+    } finally {
+      try { await client.query("SELECT pg_advisory_unlock(hashtext('opd_warrant_number'))"); } finally { client.release(); }
+    }
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     console.error(error);
