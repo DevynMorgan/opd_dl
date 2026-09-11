@@ -3,7 +3,7 @@ import { db, ensureSchema } from "../../../lib/db";
 import { getCurrentUser, requireAdmin } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
-const categories = ["people", "licenses", "citations", "warrants", "incidents", "messages"] as const;
+const categories = ["people", "licenses", "warrants", "incidents", "messages"] as const;
 type Category = typeof categories[number];
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const isCategory = (value: string): value is Category => categories.includes(value as Category);
@@ -33,10 +33,6 @@ export async function GET(request: NextRequest) {
     }
     if (type === "licenses") {
       const result = await p.query(`SELECT l.*,p.first_name,p.last_name,p.dob,p.height,p.weight,p.eyes,p.hair,p.address,p.notes AS person_notes FROM licenses l JOIN people p ON p.id=l.person_id WHERE (${search}='' OR l.license_number ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR TO_CHAR(p.dob,'MM/DD/YYYY') ILIKE '%'||${search}||'%') ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
-      return NextResponse.json(result.rows);
-    }
-    if (type === "citations") {
-      const result = await p.query(`SELECT c.*,CONCAT_WS(' ',p.first_name,p.last_name) AS name FROM citations c LEFT JOIN people p ON p.id=c.person_id WHERE (${search}='' OR c.citation_number ILIKE '%'||${search}||'%' OR c.charge ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%') ORDER BY c.issued_at DESC LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     if (type === "warrants") {
@@ -73,11 +69,6 @@ export async function POST(request: NextRequest) {
       const personId = sqlNullableBigInt(body.person_id);
       if (personId === "NULL") return NextResponse.json({ error: "A valid person ID is required" }, { status: 400 });
       const r = await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,issue_date,expiration_date,restrictions,notes) VALUES (${personId},${sqlText(body.license_number)},${sqlText(clean(body.license_class)||"C")},${sqlText(clean(body.status)||"VALID")},${sqlNullableDate(body.issue_date)},${sqlNullableDate(body.expiration_date)},${sqlNullableText(body.restrictions)},${sqlNullableText(body.notes)}) RETURNING *`);
-      return NextResponse.json(r.rows[0], { status: 201 });
-    }
-    if (type === "citations") {
-      const issuedAt = body.issued_at || new Date().toISOString();
-      const r = await p.query(`INSERT INTO citations (person_id,citation_number,charge,location,status,issued_at,officer,notes) VALUES (${sqlNullableBigInt(body.person_id)},${sqlText(body.citation_number)},${sqlText(body.charge)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(issuedAt)},${sqlText(clean(body.officer)||"1027")},${sqlNullableText(body.notes)}) RETURNING *`);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "warrants") {
