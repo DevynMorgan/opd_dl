@@ -5,12 +5,21 @@ import { createRoot, Root } from "react-dom/client";
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 import AdminUsers from "./admin-users";
 
+function displayNameForUsername(username: string) {
+  const normalized = username.trim().toLowerCase();
+  if (normalized === "sistergrimm") return "Devyn Grimm";
+  if (normalized === "admin") return "Chief";
+  if (normalized === "maxvonb") return "Max VonB";
+  return username.trim() || "Officer";
+}
+
 function updateAccountHeader(username: string) {
   const account = document.querySelector(".account-line > span:not(.chev)");
   if (!account) return;
   const normalized = username.trim().toLowerCase();
-  const displayName = normalized.includes("sistergrimm") ? "Devyn Grimm" : "Chief";
+  const displayName = displayNameForUsername(username);
   account.innerHTML = `${displayName}<br><b>OPD</b>`;
+  document.documentElement.dataset.opdRole = normalized === "admin" || normalized === "sistergrimm" ? "ADMIN" : "OFFICER";
 }
 
 function mountAdminUsers() {
