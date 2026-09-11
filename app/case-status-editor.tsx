@@ -28,57 +28,6 @@ export default function CaseStatusEditor() {
     `;
     document.head.appendChild(style);
 
-    const addWarrantControls = () => {
-      const tables = Array.from(document.querySelectorAll("table"));
-      for (const table of tables) {
-        const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.textContent?.trim().toUpperCase() || "");
-        if (!headers.includes("WARRANT #")) continue;
-        const head = table.querySelector("thead tr");
-        if (head && !head.querySelector(".case-status-action-head")) {
-          const th = document.createElement("th"); th.className = "case-status-action-head"; th.textContent = "ACTION"; head.appendChild(th);
-        }
-        for (const row of Array.from(table.querySelectorAll("tbody tr"))) {
-          if (row.dataset.caseStatusReady === "true") continue;
-          const number = row.children[0]?.textContent?.trim() || "";
-          if (!number || number === "No matching fictional records.") continue;
-          const id = (row as HTMLElement).dataset.warrantId || "";
-          const action = document.createElement("td");
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "case-status-edit-btn";
-          button.textContent = "EDIT STATUS";
-          button.addEventListener("click", e => {
-            e.preventDefault(); e.stopPropagation();
-            openEditor("warrant", id, number, row.children[3]?.textContent?.trim() || "");
-          });
-          action.appendChild(button); row.appendChild(action); row.dataset.caseStatusReady = "true";
-        }
-      }
-    };
-
-    const addIncidentControl = () => {
-      const modal = document.querySelector("#incident-detail-modal .incident-detail-modal") as HTMLElement | null;
-      if (!modal || modal.dataset.caseStatusReady === "true") return;
-      const content = modal.querySelector("#incident-detail-content") as HTMLElement | null;
-      if (!content) return;
-      const numberText = content.querySelector(".incident-report-head p")?.textContent || "";
-      const number = numberText.split("·")[0]?.trim() || "";
-      const grid = Array.from(content.querySelectorAll(".incident-grid>div"));
-      const status = Array.from(content.querySelectorAll(".incident-status"))[0]?.textContent?.trim() || "";
-      const footer = content.querySelector(".incident-case-footer");
-      if (!number || !footer) return;
-      const idPromise = fetch(`/api/records?type=incidents&q=${encodeURIComponent(number)}&limit=5`, { cache: "no-store" }).then(r => r.json()).then(rows => Array.isArray(rows) ? rows.find((x:any) => x.incident_number === number) || rows[0] : null).catch(() => null);
-      const button = document.createElement("button");
-      button.type = "button"; button.className = "case-status-edit-btn"; button.textContent = "EDIT STATUS";
-      button.addEventListener("click", async e => {
-        e.preventDefault(); e.stopPropagation();
-        const record = await idPromise;
-        openEditor("incident", record?.id ? String(record.id) : "", number, record?.status || status);
-      });
-      footer.appendChild(button);
-      modal.dataset.caseStatusReady = "true";
-    };
-
     const openEditor = (type: CaseType, id: string, label: string, current: string) => {
       if (!id) { window.alert("This record could not be identified. Please close and reopen it, then try again."); return; }
       if (document.getElementById("case-status-modal")) return;
@@ -106,6 +55,58 @@ export default function CaseStatusEditor() {
           error.style.display = "block"; button.disabled = false; button.textContent = "SAVE STATUS";
         }
       });
+    };
+
+    const addWarrantControls = () => {
+      const tables = Array.from(document.querySelectorAll("table"));
+      for (const table of tables) {
+        const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.textContent?.trim().toUpperCase() || "");
+        if (!headers.includes("WARRANT #")) continue;
+        const head = table.querySelector("thead tr");
+        if (head && !head.querySelector(".case-status-action-head")) {
+          const th = document.createElement("th"); th.className = "case-status-action-head"; th.textContent = "ACTION"; head.appendChild(th);
+        }
+        for (const row of Array.from(table.querySelectorAll("tbody tr"))) {
+          if (row.dataset.caseStatusReady === "true") continue;
+          const number = row.children[0]?.textContent?.trim() || "";
+          if (!number || number === "No matching fictional records.") continue;
+          const action = document.createElement("td");
+          const button = document.createElement("button");
+          button.type = "button"; button.className = "case-status-edit-btn"; button.textContent = "EDIT STATUS";
+          button.addEventListener("click", async e => {
+            e.preventDefault(); e.stopPropagation();
+            const current = row.children[3]?.textContent?.trim() || "";
+            try {
+              const response = await fetch(`/api/records?type=warrants&q=${encodeURIComponent(number)}&limit=5`, { cache: "no-store" });
+              const rows = await response.json();
+              const record = Array.isArray(rows) ? rows.find((x:any) => x.warrant_number === number) || rows[0] : null;
+              openEditor("warrant", record?.id ? String(record.id) : "", number, record?.status || current);
+            } catch { openEditor("warrant", "", number, current); }
+          });
+          action.appendChild(button); row.appendChild(action); row.dataset.caseStatusReady = "true";
+        }
+      }
+    };
+
+    const addIncidentControl = () => {
+      const modal = document.querySelector("#incident-detail-modal .incident-detail-modal") as HTMLElement | null;
+      if (!modal || modal.dataset.caseStatusReady === "true") return;
+      const content = modal.querySelector("#incident-detail-content") as HTMLElement | null;
+      if (!content) return;
+      const numberText = content.querySelector(".incident-report-head p")?.textContent || "";
+      const number = numberText.split("·")[0]?.trim() || "";
+      const status = Array.from(content.querySelectorAll(".incident-status"))[0]?.textContent?.trim() || "";
+      const footer = content.querySelector(".incident-case-footer");
+      if (!number || !footer) return;
+      const idPromise = fetch(`/api/records?type=incidents&q=${encodeURIComponent(number)}&limit=5`, { cache: "no-store" }).then(r => r.json()).then(rows => Array.isArray(rows) ? rows.find((x:any) => x.incident_number === number) || rows[0] : null).catch(() => null);
+      const button = document.createElement("button");
+      button.type = "button"; button.className = "case-status-edit-btn"; button.textContent = "EDIT STATUS";
+      button.addEventListener("click", async e => {
+        e.preventDefault(); e.stopPropagation();
+        const record = await idPromise;
+        openEditor("incident", record?.id ? String(record.id) : "", number, record?.status || status);
+      });
+      footer.appendChild(button); modal.dataset.caseStatusReady = "true";
     };
 
     const observer = new MutationObserver(() => { addWarrantControls(); addIncidentControl(); });
