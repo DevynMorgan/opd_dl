@@ -4,7 +4,6 @@ import { getCurrentUser, requireAdmin } from "../../../lib/auth";
 import { createSystemNotification } from "../../../lib/notifications";
 
 export const dynamic = "force-dynamic";
-const esc = (v: unknown) => String(v ?? "").replace(/'/g, "''");
 
 export async function GET() {
   try {
