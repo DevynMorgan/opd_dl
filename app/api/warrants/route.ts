@@ -55,3 +55,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Could not create warrant: ${detail}` }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await requireAdmin();
+    await ensureSchema();
+    const body = await request.json();
+    const id = Number(body.id);
+    if (!Number.isSafeInteger(id)) return NextResponse.json({ error: "Invalid warrant." }, { status: 400 });
+    const result = await db().query(`DELETE FROM warrants WHERE id=${id} RETURNING id`);
+    if (!result.rows.length) return NextResponse.json({ error: "Warrant not found." }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHORIZED") return NextResponse.json({ error: "Administrator access required." }, { status: 403 });
+    console.error(error);
+    return NextResponse.json({ error: "Could not delete warrant." }, { status: 500 });
+  }
+}
