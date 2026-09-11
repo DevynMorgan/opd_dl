@@ -84,13 +84,12 @@ export async function POST(request: NextRequest) {
     }
     if (type === "incidents") {
       const occurredAt = body.occurred_at || new Date().toISOString();
-      let incidentNumber = clean(body.incident_number);
-      if (!incidentNumber) {
-        await p.query("SELECT pg_advisory_xact_lock(hashtext('opd_incident_number'))");
-        const year = new Date(occurredAt).getFullYear();
-        const next = await p.query(`SELECT COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN CAST(SUBSTRING(incident_number FROM 10) AS INTEGER) ELSE 0 END),0)+1 AS next_number FROM incidents`);
-        incidentNumber = `OPD-${year}-${String(Number(next.rows[0].next_number)).padStart(4, "0")}`;
-      }
+      const year = new Date(occurredAt).getFullYear();
+      await p.query("SELECT pg_advisory_xact_lock(hashtext('opd_incident_number'))");
+      const next = await p.query(`SELECT COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN CAST(SUBSTRING(incident_number FROM 10) AS INTEGER) ELSE 0 END),0)+1 AS next_number, COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN LENGTH(SUBSTRING(incident_number FROM 10)) ELSE 3 END),3) AS number_width FROM incidents`);
+      const nextNumber = Number(next.rows[0].next_number);
+      const numberWidth = Math.max(3, Number(next.rows[0].number_width));
+      const incidentNumber = `OPD-${year}-${String(nextNumber).padStart(numberWidth, "0")}`;
       if (!clean(body.title)) return NextResponse.json({ error: "Incident title is required" }, { status: 400 });
       const r = await p.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes,incident_type,case_number,description,persons_involved,evidence,officer_notes,related_warrant) VALUES (${sqlText(incidentNumber)},${sqlText(body.title)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(occurredAt)},${sqlText(officer)},${sqlNullableText(body.notes)},${sqlNullableText(body.incident_type)},${sqlNullableText(body.case_number)},${sqlNullableText(body.description)},${sqlNullableText(body.persons_involved)},${sqlNullableText(body.evidence)},${sqlNullableText(body.officer_notes)},${sqlNullableText(body.related_warrant)}) RETURNING *`);
       return NextResponse.json(r.rows[0], { status: 201 });
