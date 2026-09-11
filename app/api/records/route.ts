@@ -56,12 +56,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAdmin();
+    const user = await getCurrentUser();
+    if (!user) throw new Error("UNAUTHORIZED");
     await ensureSchema();
     const body = await request.json();
     const type = clean(body.type);
     const p = db();
     const officer = officerIdentity(user.username);
+    if (type === "people" || type === "licenses" || type === "messages") {
+      if (user.role !== "ADMIN") return NextResponse.json({ error: "Administrator access required for this record type." }, { status: 403 });
+    }
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
       const r = await p.query(`INSERT INTO people (first_name,last_name,dob,gender,alias,address,height,weight,eyes,hair,status,notes) VALUES (${sqlText(body.first_name)},${sqlText(body.last_name)},${sqlNullableDate(body.dob)},${sqlNullableText(body.gender)},${sqlNullableText(body.alias)},${sqlNullableText(body.address)},${sqlNullableText(body.height)},${sqlNullableText(body.weight)},${sqlNullableText(body.eyes)},${sqlNullableText(body.hair)},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableText(body.notes)}) RETURNING *`);
