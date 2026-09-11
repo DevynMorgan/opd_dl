@@ -78,21 +78,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "warrants") {
-      const issuedAt = body.issued_at || new Date().toISOString();
-      const r = await p.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES (${sqlNullableBigInt(body.person_id)},${sqlText(body.warrant_number)},${sqlText(body.title)},${sqlText(clean(body.priority)||"STANDARD")},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableTimestamp(issuedAt)},${sqlNullableText(body.location)},${sqlText(officer)},${sqlNullableText(body.notes)}) RETURNING *`);
-      return NextResponse.json(r.rows[0], { status: 201 });
+      return NextResponse.json({ error: "Warrants must be created through the warrant service." }, { status: 400 });
     }
     if (type === "incidents") {
+      if (!clean(body.title)) return NextResponse.json({ error: "Incident title is required" }, { status: 400 });
       const occurredAt = body.occurred_at || new Date().toISOString();
       const year = new Date(occurredAt).getFullYear();
-      await p.query("SELECT pg_advisory_xact_lock(hashtext('opd_incident_number'))");
-      const next = await p.query(`SELECT COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN CAST(SUBSTRING(incident_number FROM 10) AS INTEGER) ELSE 0 END),0)+1 AS next_number, COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN LENGTH(SUBSTRING(incident_number FROM 10)) ELSE 3 END),3) AS number_width FROM incidents`);
-      const nextNumber = Number(next.rows[0].next_number);
-      const numberWidth = Math.max(3, Number(next.rows[0].number_width));
-      const incidentNumber = `OPD-${year}-${String(nextNumber).padStart(numberWidth, "0")}`;
-      if (!clean(body.title)) return NextResponse.json({ error: "Incident title is required" }, { status: 400 });
-      const r = await p.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes,incident_type,case_number,description,persons_involved,evidence,officer_notes,related_warrant) VALUES (${sqlText(incidentNumber)},${sqlText(body.title)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(occurredAt)},${sqlText(officer)},${sqlNullableText(body.notes)},${sqlNullableText(body.incident_type)},${sqlNullableText(body.case_number)},${sqlNullableText(body.description)},${sqlNullableText(body.persons_involved)},${sqlNullableText(body.evidence)},${sqlNullableText(body.officer_notes)},${sqlNullableText(body.related_warrant)}) RETURNING *`);
-      return NextResponse.json(r.rows[0], { status: 201 });
+      const client = await p.connect();
+      try {
+        await client.query("SELECT pg_advisory_lock(hashtext('opd_incident_number'))");
+        const next = await client.query(`SELECT COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN CAST(SUBSTRING(incident_number FROM 10) AS INTEGER) ELSE 0 END),0)+1 AS next_number, COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN LENGTH(SUBSTRING(incident_number FROM 10)) ELSE 3 END),3) AS number_width FROM incidents`);
+        const nextNumber = Number(next.rows[0].next_number);
+        const numberWidth = Math.max(3, Number(next.rows[0].number_width));
+        const incidentNumber = `OPD-${year}-${String(nextNumber).padStart(numberWidth, "0")}`;
+        const r = await client.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes,incident_type,case_number,description,persons_involved,evidence,officer_notes,related_warrant) VALUES (${sqlText(incidentNumber)},${sqlText(body.title)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(occurredAt)},${sqlText(officer)},${sqlNullableText(body.notes)},${sqlNullableText(body.incident_type)},${sqlNullableText(body.case_number)},${sqlNullableText(body.description)},${sqlNullableText(body.persons_involved)},${sqlNullableText(body.evidence)},${sqlNullableText(body.officer_notes)},${sqlNullableText(body.related_warrant)}) RETURNING *`);
+        return NextResponse.json(r.rows[0], { status: 201 });
+      } finally {
+        try { await client.query("SELECT pg_advisory_unlock(hashtext('opd_incident_number'))"); } finally { client.release(); }
+      }
     }
     if (type === "messages") {
       const r = await p.query(`INSERT INTO messages (subject,body,sender,priority) VALUES (${sqlText(body.subject)},${sqlText(body.body)},${sqlText(clean(body.sender)||"OPD ADMIN")},${sqlText(clean(body.priority)||"NORMAL")}) RETURNING *`);
