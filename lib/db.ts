@@ -26,7 +26,8 @@ async function createSchema(client: PoolClient) {
     CREATE TABLE IF NOT EXISTS opd_admin_users (id BIGSERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_salt TEXT NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'ADMIN', active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
     CREATE TABLE IF NOT EXISTS opd_sessions (id BIGSERIAL PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, user_id BIGINT NOT NULL REFERENCES opd_admin_users(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
     CREATE TABLE IF NOT EXISTS opd_notifications (id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'NORMAL', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-    CREATE TABLE IF NOT EXISTS opd_notification_reads (notification_id BIGINT NOT NULL REFERENCES opd_notifications(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES opd_admin_users(id) ON DELETE CASCADE, read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (notification_id,user_id));
+    CREATE TABLE IF NOT EXISTS opd_notification_reads (notification_id BIGINT NOT NULL REFERENCES opd_notifications(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES opd_admin_users(id) ON DELETE CASCADE, read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), cleared_at TIMESTAMPTZ, PRIMARY KEY (notification_id,user_id));
+    ALTER TABLE opd_notification_reads ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMPTZ;
     CREATE INDEX IF NOT EXISTS people_name_idx ON people(last_name, first_name);
     CREATE INDEX IF NOT EXISTS people_dob_idx ON people(dob);
     CREATE INDEX IF NOT EXISTS licenses_number_idx ON licenses(license_number);
