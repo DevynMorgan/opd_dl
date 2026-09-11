@@ -13,16 +13,36 @@ function displayNameForUsername(username: string) {
   return username.trim() || "Officer";
 }
 
-function updateAccountHeader(username: string) {
+function updateAccountHeader(username: string, role = "OFFICER") {
   const account = document.querySelector(".account-line > span:not(.chev)");
-  if (!account) return;
-  const normalized = username.trim().toLowerCase();
-  const displayName = displayNameForUsername(username);
-  account.innerHTML = `${displayName}<br><b>OPD</b>`;
-  document.documentElement.dataset.opdRole = normalized === "admin" || normalized === "sistergrimm" ? "ADMIN" : "OFFICER";
+  if (account) {
+    const displayName = displayNameForUsername(username);
+    account.innerHTML = `${displayName}<br><b>OPD</b>`;
+  }
+  document.documentElement.dataset.opdRole = role;
+  if (role !== "ADMIN") applyOfficerRestrictions();
+}
+
+function applyOfficerRestrictions() {
+  const role = document.documentElement.dataset.opdRole;
+  if (role === "ADMIN") return;
+  document.querySelectorAll(".sidebar nav button").forEach(button => {
+    if (button.textContent?.trim() === "Admin") {
+      (button as HTMLElement).style.display = "none";
+    }
+  });
+  document.querySelectorAll("button").forEach(button => {
+    const text = button.textContent?.trim().replace(/\s+/g, " ").toUpperCase() || "";
+    const restricted = text === "NEW RECORD" || text.includes("NEW PERSON RECORD") || text.includes("ADD PD USER") || text === "EDIT" || text.includes("EDIT RECORD") || text === "SAVE" || text.includes("DELETE RECORD");
+    if (restricted) {
+      (button as HTMLButtonElement).disabled = true;
+      (button as HTMLElement).style.display = "none";
+    }
+  });
 }
 
 function mountAdminUsers() {
+  if (document.documentElement.dataset.opdRole !== "ADMIN") return;
   const candidates = Array.from(document.querySelectorAll(".reports-panel"));
   const panel = candidates.find(el => el.textContent?.includes("ADMINISTRATION"));
   if (!panel || panel.querySelector(".admin-users-mount")) return;
@@ -39,6 +59,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
+  const [role, setRole] = useState("OFFICER");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,19 +69,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       const response = await fetch("/api/auth/me", { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        setUsername(data.user?.username || "");
+        const sessionUsername = data.user?.username || "";
+        const sessionRole = data.user?.role || "OFFICER";
+        setUsername(sessionUsername);
+        setRole(sessionRole);
         setAuthenticated(true);
-        setTimeout(() => updateAccountHeader(data.user?.username || ""), 0);
+        setTimeout(() => updateAccountHeader(sessionUsername, sessionRole), 0);
       } else setAuthenticated(false);
     } catch { setAuthenticated(false); }
     finally { setChecking(false); }
   }
 
   useEffect(() => { checkSession(); }, []);
-  useEffect(() => { if (authenticated && username) updateAccountHeader(username); }, [authenticated, username]);
+  useEffect(() => { if (authenticated && username) updateAccountHeader(username, role); }, [authenticated, username, role]);
 
   useEffect(() => {
-    if (!authenticated) return;
+    if (!authenticated || role !== "ADMIN") return;
     const observer = new MutationObserver(() => {
       const active = document.querySelector(".sidebar nav button.active");
       if (active?.textContent?.trim() === "Admin") setTimeout(mountAdminUsers, 0);
@@ -68,7 +92,15 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     const timer = window.setTimeout(mountAdminUsers, 500);
     return () => { observer.disconnect(); window.clearTimeout(timer); };
-  }, [authenticated]);
+  }, [authenticated, role]);
+
+  useEffect(() => {
+    if (!authenticated || role === "ADMIN") return;
+    const observer = new MutationObserver(() => applyOfficerRestrictions());
+    observer.observe(document.body, { childList: true, subtree: true });
+    applyOfficerRestrictions();
+    return () => observer.disconnect();
+  }, [authenticated, role]);
 
   async function signIn(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
@@ -77,8 +109,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       const data = await response.json();
       if (!response.ok) { setError(data.error || "Invalid username or password."); return; }
       const loggedInUsername = data.user?.username || username;
-      setUsername(loggedInUsername); setAuthenticated(true); setPassword("");
-      setTimeout(() => updateAccountHeader(loggedInUsername), 0);
+      const loggedInRole = data.user?.role || "OFFICER";
+      setUsername(loggedInUsername); setRole(loggedInRole); setAuthenticated(true); setPassword("");
+      setTimeout(() => updateAccountHeader(loggedInUsername, loggedInRole), 0);
     } catch { setError("Unable to reach the login service."); }
     finally { setBusy(false); }
   }
