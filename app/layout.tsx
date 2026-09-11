@@ -5,7 +5,6 @@ import AuthGate from "./auth-gate";
 import LogoutHandler from "./logout-handler";
 import AdminEnhancer from "./admin-enhancer";
 import NotificationBell from "./notification-bell";
-import WarrantEnhancer from "./warrant-enhancer";
 import IncidentEnhancer from "./incident-enhancer";
 import OfficerLock from "./officer-lock";
 
@@ -18,7 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <head><link rel="stylesheet" href="/admin.css" /></head>
-      <body><AuthGate><LogoutHandler /><AdminEnhancer /><NotificationBell /><WarrantEnhancer /><IncidentEnhancer /><OfficerLock />{children}</AuthGate></body>
+      <body><AuthGate><LogoutHandler /><AdminEnhancer /><NotificationBell /><IncidentEnhancer /><OfficerLock />{children}</AuthGate></body>
     </html>
   );
 }
