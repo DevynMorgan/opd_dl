@@ -21,18 +21,18 @@ export default function IncidentEnhancer() {
     async function polishTable(panel: HTMLElement) {
       const table = panel.querySelector("table") as HTMLTableElement | null; if (!table) return;
       table.classList.add("incident-case-table"); table.parentElement?.classList.add("incident-board");
-      const head = table.querySelector("thead tr");
+      const head = table.querySelector("thead tr") as HTMLTableRowElement | null;
       if (head && !head.dataset.incidentHeader) {
         head.dataset.incidentHeader="true";
         const labels=["INCIDENT #","DATE","TYPE","LOCATION","OFFICER","STATUS"];
         head.innerHTML=labels.map(label=>`<th>${label}</th>`).join("");
       }
-      const rows=Array.from(table.querySelectorAll("tbody tr"));
+      const rows=Array.from(table.querySelectorAll("tbody tr")) as HTMLTableRowElement[];
       for(const row of rows){
-        if((row as HTMLElement).dataset.incidentPolished==="true")continue;
+        if(row.dataset.incidentPolished==="true")continue;
         const number=row.children[0]?.textContent?.trim()||"";
         if(!number||number==="No matching fictional records."){row.classList.add("incident-empty");continue;}
-        (row as HTMLElement).dataset.incidentPolished="true"; row.style.cursor="pointer"; row.title="Open incident report";
+        row.dataset.incidentPolished="true"; row.style.cursor="pointer"; row.title="Open incident report";
         const old=[...row.children].map(c=>c.textContent?.trim()||"");
         let record:any=null; try{record=await fetchIncident(number)}catch{}
         const date=record?.occurred_at||old[3]; const type=record?.incident_type||"General Incident"; const location=record?.location||old[2]||"Not specified"; const officer=record?.officer||"OPD Officer"; const status=String(record?.status||old[4]||"OPEN").toUpperCase(); const caseNo=record?.case_number||"";
