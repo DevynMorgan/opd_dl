@@ -3,7 +3,7 @@ import { db, ensureSchema } from "../../../lib/db";
 import { getCurrentUser, requireAdmin } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
-const categories = ["people", "licenses", "vehicles", "citations", "warrants", "incidents", "messages"] as const;
+const categories = ["people", "licenses", "citations", "warrants", "incidents", "messages"] as const;
 type Category = typeof categories[number];
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const isCategory = (value: string): value is Category => categories.includes(value as Category);
@@ -11,7 +11,6 @@ const sqlText = (value: unknown) => `'${clean(value).replace(/'/g, "''")}'`;
 const sqlNullableText = (value: unknown) => { const text = clean(value); return text ? sqlText(text) : "NULL"; };
 const sqlNullableDate = (value: unknown) => { const text = clean(value); return text ? `${sqlText(text)}::date` : "NULL"; };
 const sqlNullableTimestamp = (value: unknown) => { const text = clean(value); return text ? `${sqlText(text)}::timestamptz` : "NULL"; };
-const sqlNullableInteger = (value: unknown) => { if (value === null || value === undefined || value === "") return "NULL"; const n = Number(value); return Number.isFinite(n) ? String(Math.trunc(n)) : "NULL"; };
 const sqlNullableBigInt = (value: unknown) => { if (value === null || value === undefined || value === "") return "NULL"; const n = Number(value); return Number.isSafeInteger(n) ? String(n) : "NULL"; };
 const unauthorized = (error: unknown) => error instanceof Error && error.message === "UNAUTHORIZED";
 
@@ -29,15 +28,11 @@ export async function GET(request: NextRequest) {
     const search = sqlText(q);
     const limitSql = String(Math.trunc(limit));
     if (type === "people") {
-      const result = await p.query(`SELECT p.*, COALESCE(l.license_number,'') AS license_number, COALESCE(l.license_class,'') AS license_class, COALESCE(l.status,'NO LICENSE') AS license_status, COALESCE(v.vehicle_label,'No registered vehicles') AS vehicle_label FROM people p LEFT JOIN LATERAL (SELECT license_number,license_class,status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1) l ON true LEFT JOIN LATERAL (SELECT CONCAT(year,' ',COALESCE(color,''),' ',COALESCE(make,''),' ',COALESCE(model,'')) AS vehicle_label FROM vehicles WHERE person_id=p.id ORDER BY id DESC LIMIT 1) v ON true WHERE (${search}='' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR p.first_name ILIKE '%'||${search}||'%' OR p.last_name ILIKE '%'||${search}||'%' OR COALESCE(p.alias,'') ILIKE '%'||${search}||'%' OR COALESCE(TO_CHAR(p.dob,'MM/DD/YYYY'),'') ILIKE '%'||${search}||'%') ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
+      const result = await p.query(`SELECT p.*, COALESCE(l.license_number,'') AS license_number, COALESCE(l.license_class,'') AS license_class, COALESCE(l.status,'NO LICENSE') AS license_status FROM people p LEFT JOIN LATERAL (SELECT license_number,license_class,status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1) l ON true WHERE (${search}='' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR p.first_name ILIKE '%'||${search}||'%' OR p.last_name ILIKE '%'||${search}||'%' OR COALESCE(p.alias,'') ILIKE '%'||${search}||'%' OR COALESCE(TO_CHAR(p.dob,'MM/DD/YYYY'),'') ILIKE '%'||${search}||'%') ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     if (type === "licenses") {
       const result = await p.query(`SELECT l.*,p.first_name,p.last_name,p.dob,p.height,p.weight,p.eyes,p.hair,p.address,p.notes AS person_notes FROM licenses l JOIN people p ON p.id=l.person_id WHERE (${search}='' OR l.license_number ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR TO_CHAR(p.dob,'MM/DD/YYYY') ILIKE '%'||${search}||'%') ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
-      return NextResponse.json(result.rows);
-    }
-    if (type === "vehicles") {
-      const result = await p.query(`SELECT v.*,p.first_name,p.last_name,CONCAT_WS(' ',p.first_name,p.last_name) AS owner FROM vehicles v LEFT JOIN people p ON p.id=v.person_id WHERE (${search}='' OR v.plate ILIKE '%'||${search}||'%' OR COALESCE(v.vin,'') ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',v.year,v.make,v.model,v.color) ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%') ORDER BY v.id DESC LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     if (type === "citations") {
@@ -78,10 +73,6 @@ export async function POST(request: NextRequest) {
       const personId = sqlNullableBigInt(body.person_id);
       if (personId === "NULL") return NextResponse.json({ error: "A valid person ID is required" }, { status: 400 });
       const r = await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,issue_date,expiration_date,restrictions,notes) VALUES (${personId},${sqlText(body.license_number)},${sqlText(clean(body.license_class)||"C")},${sqlText(clean(body.status)||"VALID")},${sqlNullableDate(body.issue_date)},${sqlNullableDate(body.expiration_date)},${sqlNullableText(body.restrictions)},${sqlNullableText(body.notes)}) RETURNING *`);
-      return NextResponse.json(r.rows[0], { status: 201 });
-    }
-    if (type === "vehicles") {
-      const r = await p.query(`INSERT INTO vehicles (person_id,plate,vin,year,make,model,color,registration_status,notes) VALUES (${sqlNullableBigInt(body.person_id)},${sqlText(body.plate)},${sqlNullableText(body.vin)},${sqlNullableInteger(body.year)},${sqlNullableText(body.make)},${sqlNullableText(body.model)},${sqlNullableText(body.color)},${sqlText(clean(body.registration_status)||"ACTIVE")},${sqlNullableText(body.notes)}) RETURNING *`);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "citations") {
