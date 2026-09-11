@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "../../../lib/db";
-import { requireAdmin } from "../../../lib/auth";
+import { getCurrentUser, requireAdmin } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 const categories = ["people", "licenses", "vehicles", "citations", "warrants", "incidents", "messages"] as const;
@@ -17,7 +17,8 @@ const unauthorized = (error: unknown) => error instanceof Error && error.message
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin();
+    const user = await getCurrentUser();
+    if (!user) throw new Error("UNAUTHORIZED");
     await ensureSchema();
     const { searchParams } = new URL(request.url);
     const type = clean(searchParams.get("type") || "people");
