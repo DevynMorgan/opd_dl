@@ -28,7 +28,7 @@ export default function NotificationBell() {
     const style = document.createElement("style");
     style.id = "opd-notification-position";
     style.textContent = `
-      .notification-wrap{position:fixed!important;top:18px!important;right:304px!important;z-index:1000!important}
+      .notification-wrap{position:absolute!important;top:18px!important;right:304px!important;z-index:1000!important}
       .notification-panel{z-index:1001!important}
       @media(max-width:900px){.notification-wrap{right:18px!important}}
     `;
