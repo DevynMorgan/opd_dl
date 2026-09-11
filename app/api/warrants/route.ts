@@ -29,12 +29,17 @@ export async function POST(request: NextRequest) {
       ALTER TABLE warrants ADD COLUMN IF NOT EXISTS issuing_authority TEXT;
     `);
 
-    const warrantNumber = clean(body.warrant_number);
     const charge = clean(body.charge);
     const title = charge || clean(body.title);
-    if (!warrantNumber || !title) return NextResponse.json({ error: "Warrant number and charge / reason are required." }, { status: 400 });
+    if (!title) return NextResponse.json({ error: "Charge / reason is required." }, { status: 400 });
 
     const issuedAt = clean(body.issued_at) ? body.issued_at : new Date().toISOString();
+    const year = new Date(issuedAt).getFullYear();
+    await p.query("SELECT pg_advisory_xact_lock(hashtext('opd_warrant_number'))");
+    const next = await p.query(`SELECT COALESCE(MAX(CASE WHEN warrant_number ~ '^W-${year}-[0-9]+$' THEN CAST(SUBSTRING(warrant_number FROM 9) AS INTEGER) ELSE 0 END),0)+1 AS next_number, COALESCE(MAX(CASE WHEN warrant_number ~ '^W-${year}-[0-9]+$' THEN LENGTH(SUBSTRING(warrant_number FROM 9)) ELSE 3 END),3) AS number_width FROM warrants`);
+    const nextNumber = Number(next.rows[0].next_number);
+    const numberWidth = Math.max(3, Number(next.rows[0].number_width));
+    const warrantNumber = `W-${year}-${String(nextNumber).padStart(numberWidth, "0")}`;
     const officer = officerIdentity(user.username);
     const personId = nullableBigInt(body.person_id);
 
