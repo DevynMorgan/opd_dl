@@ -3,6 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 
+function updateAccountHeader(username: string) {
+  const account = document.querySelector(".account-line > span:not(.chev)");
+  if (!account) return;
+
+  const normalized = username.trim().toLowerCase();
+  const displayName = normalized.includes("sistergrimm") ? "Devyn Grimm" : "Chief";
+  account.innerHTML = `${displayName}<br><b>OPD</b>`;
+}
+
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
@@ -14,7 +23,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   async function checkSession() {
     try {
       const response = await fetch("/api/auth/me", { cache: "no-store" });
-      setAuthenticated(response.ok);
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setUsername(data.user?.username || "");
+        setAuthenticated(true);
+        setTimeout(() => updateAccountHeader(data.user?.username || ""), 0);
+      } else {
+        setAuthenticated(false);
+      }
     } catch {
       setAuthenticated(false);
     } finally {
@@ -23,6 +39,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => { checkSession(); }, []);
+
+  useEffect(() => {
+    if (authenticated && username) updateAccountHeader(username);
+  }, [authenticated, username]);
 
   async function signIn(event: FormEvent) {
     event.preventDefault();
@@ -35,8 +55,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       });
       const data = await response.json();
       if (!response.ok) { setError(data.error || "Invalid username or password."); return; }
+      const loggedInUsername = data.user?.username || username;
+      setUsername(loggedInUsername);
       setAuthenticated(true);
       setPassword("");
+      setTimeout(() => updateAccountHeader(loggedInUsername), 0);
     } catch {
       setError("Unable to reach the login service.");
     } finally {
