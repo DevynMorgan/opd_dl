@@ -6,10 +6,9 @@ export async function GET() {
   try {
     const current = await requireAdmin();
     await ensureSchema();
-    const [people, licenses, citations, warrants, incidents, messages, admins, sessions] = await Promise.all([
+    const [people, licenses, warrants, incidents, messages, admins, sessions] = await Promise.all([
       db().query("SELECT COUNT(*)::int AS count FROM people"),
       db().query("SELECT COUNT(*)::int AS count FROM licenses"),
-      db().query("SELECT COUNT(*)::int AS count FROM citations"),
       db().query("SELECT COUNT(*)::int AS count FROM warrants"),
       db().query("SELECT COUNT(*)::int AS count FROM incidents"),
       db().query("SELECT COUNT(*)::int AS count FROM messages"),
@@ -18,7 +17,7 @@ export async function GET() {
     ]);
     return NextResponse.json({
       currentUser: { username: current.username, role: current.role },
-      counts: { people: people.rows[0].count, licenses: licenses.rows[0].count, citations: citations.rows[0].count, warrants: warrants.rows[0].count, incidents: incidents.rows[0].count, messages: messages.rows[0].count },
+      counts: { people: people.rows[0].count, licenses: licenses.rows[0].count, warrants: warrants.rows[0].count, incidents: incidents.rows[0].count, messages: messages.rows[0].count },
       admins: admins.rows,
       activeSessions: sessions.rows[0].count,
       database: "CONNECTED",
