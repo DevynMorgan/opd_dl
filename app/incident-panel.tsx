@@ -28,7 +28,7 @@ export default function IncidentPanel({ records, loading, onRefresh }: Props) {
   const [editingStatus, setEditingStatus] = useState(false);
   const [newStatus, setNewStatus] = useState("OPEN");
   const [form, setForm] = useState({
-    incident_number: "", incident_type: "General Incident", title: "", status: "OPEN", case_number: "",
+    incident_number: "ASSIGNING…", incident_type: "General Incident", title: "", status: "OPEN", case_number: "",
     occurred_at: "", location: "", description: "", persons_involved: "", evidence: "", officer_notes: "", related_warrant: ""
   });
 
@@ -37,6 +37,18 @@ export default function IncidentPanel({ records, loading, onRefresh }: Props) {
       if (d?.user?.username) setOfficer(officerIdentity(String(d.user.username)));
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!showNew) return;
+    setForm(f => ({ ...f, incident_number: "ASSIGNING…" }));
+    fetch("/api/case-numbers?type=incident", { cache: "no-store" })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => {
+        if (ok && data?.number) setForm(f => ({ ...f, incident_number: String(data.number) }));
+        else setForm(f => ({ ...f, incident_number: "AUTO ASSIGNED" }));
+      })
+      .catch(() => setForm(f => ({ ...f, incident_number: "AUTO ASSIGNED" })));
+  }, [showNew]);
 
   function set(key: string, value: string) { setForm(f => ({ ...f, [key]: value })); }
   function closeNew() { setShowNew(false); setError(""); setSaving(false); }
@@ -86,7 +98,7 @@ export default function IncidentPanel({ records, loading, onRefresh }: Props) {
     {showNew && <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) closeNew(); }}><div className="record-modal incident-entry-modal" role="dialog" aria-modal="true" aria-label="New incident report">
       <button className="modal-close" type="button" onClick={closeNew}>×</button><div className="modal-head"><div className="modal-icon">▣</div><div><small>OPALINE POLICE DEPARTMENT</small><h2>NEW INCIDENT REPORT</h2><p>Create a fictional case file for the OPD RP database.</p></div></div>
       {error && <div className="auth-error" style={{ display: "block", marginTop: 15 }}>{error}</div>}
-      <div className="new-form"><label>Incident Number<input value={form.incident_number} onChange={e => set("incident_number", e.target.value)} placeholder="Automatic: OPD-2026-0001" /></label><label>Incident Type<select value={form.incident_type} onChange={e => set("incident_type", e.target.value)}><option>General Incident</option><option>Missing Person</option><option>Suspicious Death</option><option>Homicide</option><option>Assault</option><option>Burglary</option><option>Domestic Disturbance</option><option>Drug Offense</option><option>Traffic Incident</option><option>Welfare Check</option><option>Other</option></select></label><label>Incident Title *<input value={form.title} onChange={e => set("title", e.target.value)} placeholder="Short case title" /></label><label>Status<select value={form.status} onChange={e => set("status", e.target.value)}>{statuses.map(s => <option key={s}>{s}</option>)}</select></label><label>Case Number<input value={form.case_number} onChange={e => set("case_number", e.target.value)} placeholder="CASE-2026-0001" /></label><label>Date / Time<input type="datetime-local" value={form.occurred_at} onChange={e => set("occurred_at", e.target.value)} /></label><label>Location<input value={form.location} onChange={e => set("location", e.target.value)} placeholder="Address, business, area, or scene" /></label><label>Reporting Officer<input value={officer} readOnly aria-readonly="true" /></label><label style={{ gridColumn: "1/-1" }}>Incident Narrative<textarea value={form.description} onChange={e => set("description", e.target.value)} rows={5} /></label><label style={{ gridColumn: "1/-1" }}>Persons Involved<textarea value={form.persons_involved} onChange={e => set("persons_involved", e.target.value)} rows={3} /></label><label style={{ gridColumn: "1/-1" }}>Evidence / Attachments<textarea value={form.evidence} onChange={e => set("evidence", e.target.value)} rows={3} /></label><label style={{ gridColumn: "1/-1" }}>Officer Notes<textarea value={form.officer_notes} onChange={e => set("officer_notes", e.target.value)} rows={3} /></label><label style={{ gridColumn: "1/-1" }}>Related Warrant<input value={form.related_warrant} onChange={e => set("related_warrant", e.target.value)} /></label></div>
+      <div className="new-form"><label>Incident Number (Automatic)<input value={form.incident_number} readOnly aria-readonly="true" tabIndex={-1} style={{ background: "#e8eef4", color: "#526d89", fontWeight: 800, cursor: "not-allowed" }} /><small style={{ display: "block", marginTop: 5, color: "#71879d", fontSize: 9 }}>Assigned by the OPD database. This number cannot be changed.</small></label><label>Incident Type<select value={form.incident_type} onChange={e => set("incident_type", e.target.value)}><option>General Incident</option><option>Missing Person</option><option>Suspicious Death</option><option>Homicide</option><option>Assault</option><option>Burglary</option><option>Domestic Disturbance</option><option>Drug Offense</option><option>Traffic Incident</option><option>Welfare Check</option><option>Other</option></select></label><label>Incident Title *<input value={form.title} onChange={e => set("title", e.target.value)} placeholder="Short case title" /></label><label>Status<select value={form.status} onChange={e => set("status", e.target.value)}>{statuses.map(s => <option key={s}>{s}</option>)}</select></label><label>Case Number<input value={form.case_number} onChange={e => set("case_number", e.target.value)} placeholder="CASE-2026-0001" /></label><label>Date / Time<input type="datetime-local" value={form.occurred_at} onChange={e => set("occurred_at", e.target.value)} /></label><label>Location<input value={form.location} onChange={e => set("location", e.target.value)} placeholder="Address, business, area, or scene" /></label><label>Reporting Officer<input value={officer} readOnly aria-readonly="true" /></label><label style={{ gridColumn: "1/-1" }}>Incident Narrative<textarea value={form.description} onChange={e => set("description", e.target.value)} rows={5} /></label><label style={{ gridColumn: "1/-1" }}>Persons Involved<textarea value={form.persons_involved} onChange={e => set("persons_involved", e.target.value)} rows={3} /></label><label style={{ gridColumn: "1/-1" }}>Evidence / Attachments<textarea value={form.evidence} onChange={e => set("evidence", e.target.value)} rows={3} /></label><label style={{ gridColumn: "1/-1" }}>Officer Notes<textarea value={form.officer_notes} onChange={e => set("officer_notes", e.target.value)} rows={3} /></label><label style={{ gridColumn: "1/-1" }}>Related Warrant<input value={form.related_warrant} onChange={e => set("related_warrant", e.target.value)} /></label></div>
       <div className="modal-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><button type="button" onClick={closeNew}>CANCEL</button><button className="primary" type="button" disabled={saving} onClick={saveNew}>{saving ? "SAVING…" : "SAVE INCIDENT"}</button></div>
     </div></div>}
   </>;
