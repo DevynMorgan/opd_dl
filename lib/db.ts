@@ -44,6 +44,22 @@ async function createSchema(client: PoolClient) {
       ('admin','a55cbc28783af032b797a93ab99296de','3b4dc86eccae5add2f0caa412909a8dab72a0b7ce411a4e1495aa72d61905990','ADMIN',TRUE)
     ON CONFLICT (username) DO UPDATE SET password_salt=EXCLUDED.password_salt,password_hash=EXCLUDED.password_hash,role=EXCLUDED.role,active=EXCLUDED.active
   `);
+  await client.query(`
+    CREATE OR REPLACE FUNCTION opd_notify_record_added() RETURNS trigger AS $fn$
+    BEGIN
+      IF TG_TABLE_NAME = 'incidents' THEN
+        INSERT INTO opd_notifications (kind,subject,body,priority) VALUES ('INCIDENT_ADDED','Incident Report Added', 'Incident ' || NEW.incident_number || ' · ' || NEW.title || ' was added to the OPD system by ' || COALESCE(NULLIF(NEW.officer,''),'OPD Officer') || '.', 'NORMAL');
+      ELSIF TG_TABLE_NAME = 'warrants' THEN
+        INSERT INTO opd_notifications (kind,subject,body,priority) VALUES ('WARRANT_ADDED','New Warrant Added', 'Warrant ' || NEW.warrant_number || ' · ' || NEW.title || ' was added to the OPD system by ' || COALESCE(NULLIF(NEW.officer,''),'OPD Officer') || '.', COALESCE(NULLIF(NEW.priority,''),'NORMAL'));
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$ LANGUAGE plpgsql;
+    DROP TRIGGER IF EXISTS opd_incident_notification ON incidents;
+    CREATE TRIGGER opd_incident_notification AFTER INSERT ON incidents FOR EACH ROW EXECUTE FUNCTION opd_notify_record_added();
+    DROP TRIGGER IF EXISTS opd_warrant_notification ON warrants;
+    CREATE TRIGGER opd_warrant_notification AFTER INSERT ON warrants FOR EACH ROW EXECUTE FUNCTION opd_notify_record_added();
+  `);
 }
 
 export async function ensureSchema() { if (schemaReady) return schemaReady; schemaReady = (async () => { const client = await getSchemaPool().connect(); try { await client.query("BEGIN"); await createSchema(client); await client.query("COMMIT"); } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); } })().catch((error) => { schemaReady = null; throw error; }); return schemaReady; }
