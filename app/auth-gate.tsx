@@ -10,19 +10,23 @@ function displayNameForUsername(username: string) {
   if (normalized === "sistergrimm") return "Devyn Grimm";
   if (normalized === "admin") return "Chief";
   if (normalized === "maxvonb") return "Max VonB";
+  if (normalized === "rowanc") return "RowanC";
   return username.trim() || "Officer";
 }
 
-function accountTitleForUsername(username: string) {
-  return username.trim().toLowerCase() === "maxvonb" ? "Officer #301" : "OPD";
+function officerNumberForUsername(username: string) {
+  const normalized = username.trim().toLowerCase();
+  if (normalized === "maxvonb") return "301";
+  if (normalized === "rowanc") return "203";
+  return "OPD";
 }
 
 function updateAccountHeader(username: string, role = "OFFICER") {
   const account = document.querySelector(".account-line > span:not(.chev)");
   if (account) {
     const displayName = displayNameForUsername(username);
-    const accountTitle = accountTitleForUsername(username);
-    account.innerHTML = `${displayName}<br><b>${accountTitle}</b>`;
+    const officerNumber = officerNumberForUsername(username);
+    account.innerHTML = `${displayName}<br><b>${officerNumber}</b>`;
   }
   document.documentElement.dataset.opdRole = role;
   if (role !== "ADMIN") applyOfficerRestrictions();
