@@ -13,6 +13,7 @@ type Props = {
 
 export default function WarrantPanel({ records, loading, onRefresh }: Props) {
   const [admin, setAdmin] = useState(false);
+  const [canCreate, setCanCreate] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [officer, setOfficer] = useState("");
   const [people, setPeople] = useState<Warrant[]>([]);
@@ -28,6 +29,7 @@ export default function WarrantPanel({ records, loading, onRefresh }: Props) {
     fetch("/api/auth/me", { cache: "no-store" }).then(r => r.json()).then(d => {
       const user = d?.user;
       setAdmin(user?.role === "ADMIN");
+      setCanCreate(Boolean(user));
       if (user?.username) setOfficer(officerIdentity(String(user.username)));
     }).catch(() => {});
   }, []);
@@ -71,7 +73,7 @@ export default function WarrantPanel({ records, loading, onRefresh }: Props) {
   }
 
   return <>
-    {admin && <div style={{ display: "flex", justifyContent: "flex-end", margin: "0 0 10px" }}><button className="header-action" type="button" onClick={() => setShowNew(true)}>＋ NEW WARRANT</button></div>}
+    {canCreate && <div style={{ display: "flex", justifyContent: "flex-end", margin: "0 0 10px" }}><button className="header-action" type="button" onClick={() => setShowNew(true)}>＋ NEW WARRANT</button></div>}
     {loading ? <div className="loading-box">Loading persistent records…</div> : <div className="table-wrap"><table><thead><tr><th>WARRANT #</th><th>NAME</th><th>PRIORITY</th><th>STATUS</th><th>ISSUED</th><th>LOCATION</th>{admin && <th>ADMIN</th>}</tr></thead><tbody>{records.length ? records.map(r => <tr key={r.id}><td>{r.warrant_number}</td><td>{r.name || "Unknown"}</td><td>{r.priority}</td><td>{r.status}</td><td>{r.issued_at ? new Date(r.issued_at).toLocaleDateString("en-US") : ""}</td><td>{r.location || ""}</td>{admin && <td><button className="warrant-delete-button" type="button" onClick={() => remove(String(r.warrant_number))}>DELETE</button></td>}</tr>) : <tr><td colSpan={admin ? 7 : 6}>No matching fictional records.</td></tr>}</tbody></table></div>}
 
     {showNew && <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) close(); }}><div className="record-modal warrant-entry-modal" role="dialog" aria-modal="true" aria-label="New warrant">
