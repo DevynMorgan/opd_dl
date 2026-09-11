@@ -56,3 +56,24 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Could not mark notification as read." }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    await ensureSchema();
+    const body = await request.json().catch(() => ({}));
+    const id = Number(body.id);
+    if (!Number.isSafeInteger(id)) return NextResponse.json({ error: "Invalid notification." }, { status: 400 });
+
+    await db().query(`
+      INSERT INTO opd_notification_reads (notification_id,user_id)
+      VALUES (${id},${Number(user.id)})
+      ON CONFLICT (notification_id,user_id) DO NOTHING
+    `);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Could not clear notification." }, { status: 500 });
+  }
+}
