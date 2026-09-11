@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "../../../lib/db";
 import { getCurrentUser, requireAdmin } from "../../../lib/auth";
+import { officerIdentity } from "../../../lib/officer-identity";
 
 export const dynamic = "force-dynamic";
 const categories = ["people", "licenses", "warrants", "incidents", "messages"] as const;
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const type = clean(body.type);
     const p = db();
+    const officer = officerIdentity(user.username);
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
       const r = await p.query(`INSERT INTO people (first_name,last_name,dob,gender,alias,address,height,weight,eyes,hair,status,notes) VALUES (${sqlText(body.first_name)},${sqlText(body.last_name)},${sqlNullableDate(body.dob)},${sqlNullableText(body.gender)},${sqlNullableText(body.alias)},${sqlNullableText(body.address)},${sqlNullableText(body.height)},${sqlNullableText(body.weight)},${sqlNullableText(body.eyes)},${sqlNullableText(body.hair)},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableText(body.notes)}) RETURNING *`);
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
     if (type === "warrants") {
       const issuedAt = body.issued_at || new Date().toISOString();
-      const r = await p.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES (${sqlNullableBigInt(body.person_id)},${sqlText(body.warrant_number)},${sqlText(body.title)},${sqlText(clean(body.priority)||"STANDARD")},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableTimestamp(issuedAt)},${sqlNullableText(body.location)},${sqlText(user.username)},${sqlNullableText(body.notes)}) RETURNING *`);
+      const r = await p.query(`INSERT INTO warrants (person_id,warrant_number,title,priority,status,issued_at,location,officer,notes) VALUES (${sqlNullableBigInt(body.person_id)},${sqlText(body.warrant_number)},${sqlText(body.title)},${sqlText(clean(body.priority)||"STANDARD")},${sqlText(clean(body.status)||"ACTIVE")},${sqlNullableTimestamp(issuedAt)},${sqlNullableText(body.location)},${sqlText(officer)},${sqlNullableText(body.notes)}) RETURNING *`);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "incidents") {
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
         incidentNumber = `OPD-${year}-${String(Number(next.rows[0].next_number)).padStart(4, "0")}`;
       }
       if (!clean(body.title)) return NextResponse.json({ error: "Incident title is required" }, { status: 400 });
-      const r = await p.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes,incident_type,case_number,description,persons_involved,evidence,officer_notes,related_warrant) VALUES (${sqlText(incidentNumber)},${sqlText(body.title)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(occurredAt)},${sqlText(user.username)},${sqlNullableText(body.notes)},${sqlNullableText(body.incident_type)},${sqlNullableText(body.case_number)},${sqlNullableText(body.description)},${sqlNullableText(body.persons_involved)},${sqlNullableText(body.evidence)},${sqlNullableText(body.officer_notes)},${sqlNullableText(body.related_warrant)}) RETURNING *`);
+      const r = await p.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes,incident_type,case_number,description,persons_involved,evidence,officer_notes,related_warrant) VALUES (${sqlText(incidentNumber)},${sqlText(body.title)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(occurredAt)},${sqlText(officer)},${sqlNullableText(body.notes)},${sqlNullableText(body.incident_type)},${sqlNullableText(body.case_number)},${sqlNullableText(body.description)},${sqlNullableText(body.persons_involved)},${sqlNullableText(body.evidence)},${sqlNullableText(body.officer_notes)},${sqlNullableText(body.related_warrant)}) RETURNING *`);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "messages") {
