@@ -25,12 +25,20 @@ export default function NotificationBell() {
   }
 
   useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "opd-notification-position";
+    style.textContent = `
+      .notification-wrap{position:fixed!important;top:18px!important;right:304px!important;z-index:1000!important}
+      .notification-panel{z-index:1001!important}
+      @media(max-width:900px){.notification-wrap{right:18px!important}}
+    `;
+    document.head.appendChild(style);
     load();
     fetch("/api/auth/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(data => setAdmin(data?.user?.role === "ADMIN")).catch(() => {});
     const timer = window.setInterval(load, 30000);
     const outside = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", outside);
-    return () => { window.clearInterval(timer); document.removeEventListener("mousedown", outside); };
+    return () => { window.clearInterval(timer); document.removeEventListener("mousedown", outside); style.remove(); };
   }, []);
 
   const unread = items.filter(n => !n.read).length;
