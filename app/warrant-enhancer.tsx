@@ -102,7 +102,7 @@ export default function WarrantEnhancer() {
             <label>Case Number<input id="warrant-case" placeholder="CASE-2026-0001" /></label>
             <label>Bond<input id="warrant-bond" placeholder="No bond / $ amount" /></label>
             <label>Last Known Location<input id="warrant-location" placeholder="Address or area" /></label>
-            <label>Issuing Officer<input id="warrant-officer" placeholder="Officer / badge" /></label>
+            <label>Issuing Officer *<input id="warrant-officer" placeholder="Current account" readonly /></label>
             <label style="grid-column:1/-1">Probable Cause / Description<textarea id="warrant-description" rows="4" placeholder="Describe the reason for the warrant and relevant RP details..."></textarea></label>
             <label style="grid-column:1/-1">Special Instructions / Notes<textarea id="warrant-notes" rows="3" placeholder="Approach instructions, cautions, or other RP notes..."></textarea></label>
           </div>
@@ -122,6 +122,11 @@ export default function WarrantEnhancer() {
       const now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
       issued.value = now.toISOString().slice(0, 16);
+
+      const officer = backdrop.querySelector("#warrant-officer") as HTMLInputElement;
+      fetch("/api/auth/me", { cache: "no-store" }).then(r => r.json()).then(data => {
+        if (data?.user?.username) officer.value = data.user.username;
+      }).catch(() => {});
 
       const peopleSelect = backdrop.querySelector("#warrant-person") as HTMLSelectElement;
       fetch("/api/records?type=people&limit=200", { cache: "no-store" }).then(r => r.ok ? r.json() : []).then(people => {
