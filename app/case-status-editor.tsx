@@ -66,7 +66,8 @@ export default function CaseStatusEditor() {
         if (head && !head.querySelector(".case-status-action-head")) {
           const th = document.createElement("th"); th.className = "case-status-action-head"; th.textContent = "ACTION"; head.appendChild(th);
         }
-        for (const row of Array.from(table.querySelectorAll("tbody tr"))) {
+        const rows = Array.from(table.querySelectorAll("tbody tr")) as HTMLTableRowElement[];
+        for (const row of rows) {
           if (row.dataset.caseStatusReady === "true") continue;
           const number = row.children[0]?.textContent?.trim() || "";
           if (!number || number === "No matching fictional records.") continue;
