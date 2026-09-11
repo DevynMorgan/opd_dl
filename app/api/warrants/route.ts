@@ -62,8 +62,10 @@ export async function DELETE(request: NextRequest) {
     await ensureSchema();
     const body = await request.json();
     const id = Number(body.id);
-    if (!Number.isSafeInteger(id)) return NextResponse.json({ error: "Invalid warrant." }, { status: 400 });
-    const result = await db().query(`DELETE FROM warrants WHERE id=${id} RETURNING id`);
+    const warrantNumber = clean(body.warrant_number);
+    if (!Number.isSafeInteger(id) && !warrantNumber) return NextResponse.json({ error: "Invalid warrant." }, { status: 400 });
+    const where = Number.isSafeInteger(id) ? `id=${id}` : `warrant_number=${text(warrantNumber)}`;
+    const result = await db().query(`DELETE FROM warrants WHERE ${where} RETURNING id`);
     if (!result.rows.length) return NextResponse.json({ error: "Warrant not found." }, { status: 404 });
     return NextResponse.json({ ok: true });
   } catch (error) {
