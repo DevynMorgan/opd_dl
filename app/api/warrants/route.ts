@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ensureSchema } from "../../../lib/db";
 import { requireAdmin } from "../../../lib/auth";
+import { officerIdentity } from "../../../lib/officer-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!warrantNumber || !title) return NextResponse.json({ error: "Warrant number and charge / reason are required." }, { status: 400 });
 
     const issuedAt = clean(body.issued_at) ? body.issued_at : new Date().toISOString();
-    const officer = user.username;
+    const officer = officerIdentity(user.username);
     const personId = nullableBigInt(body.person_id);
 
     const result = await p.query(`
