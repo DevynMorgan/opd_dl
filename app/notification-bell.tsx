@@ -44,6 +44,11 @@ export default function NotificationBell() {
     await fetch("/api/notifications", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id }) }).catch(() => {});
   }
 
+  async function clearNotification(id: number) {
+    setItems(prev => prev.filter(n => n.id !== id));
+    await fetch("/api/notifications", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
+  }
+
   async function createNotice() {
     if (!subject.trim() || !body.trim()) return;
     setSaving(true);
@@ -56,7 +61,7 @@ export default function NotificationBell() {
     <button className={`notification-button${unread ? " has-unread" : ""}`} aria-label="System notifications" onClick={() => setOpen(v => !v)}><Bell size={21} />{unread > 0 && <span className="notification-count">{unread > 99 ? "99+" : unread}</span>}</button>
     {open && <div className="notification-panel">
       <div className="notification-head"><div><small>OPD SYSTEM</small><h3>SYSTEM NOTIFICATIONS</h3></div><button onClick={() => setOpen(false)}><X size={17} /></button></div>
-      <div className="notification-list">{items.length ? items.map(item => <button key={item.id} className={`notification-item${item.read ? " read" : ""}`} onClick={() => markRead(item)}><div className="notification-icon">{icon(item.kind)}</div><div className="notification-copy"><span>{label(item.kind)}{item.priority && item.priority !== "NORMAL" ? ` · ${item.priority}` : ""}</span><strong>{item.subject}</strong><p>{item.body}</p><small>{time(item.created_at)}</small></div>{!item.read && <i className="notification-unread" />}</button>) : <div className="notification-empty">No system notifications.</div>}</div>
+      <div className="notification-list">{items.length ? items.map(item => <div key={item.id} className={`notification-item${item.read ? " read" : ""}`} onClick={() => markRead(item)}><div className="notification-icon">{icon(item.kind)}</div><div className="notification-copy"><span>{label(item.kind)}{item.priority && item.priority !== "NORMAL" ? ` · ${item.priority}` : ""}</span><strong>{item.subject}</strong><p>{item.body}</p><small>{time(item.created_at)}</small></div><div className="notification-item-actions">{!item.read && <i className="notification-unread" />}<button className="notification-clear" aria-label={`Clear ${item.subject}`} title="Clear notification" onClick={e => { e.stopPropagation(); clearNotification(item.id); }}><X size={14} /></button></div></div>) : <div className="notification-empty">No system notifications.</div>}</div>
       {admin && <button className="notification-admin" onClick={() => setNoticeOpen(true)}><Megaphone size={16} /> NEW OPD SYSTEM NOTICE</button>}
     </div>}
     {noticeOpen && <div className="notice-backdrop"><div className="notice-modal"><button className="modal-close" onClick={() => setNoticeOpen(false)}><X /></button><div className="notification-head"><div><small>ADMINISTRATION</small><h3>NEW OPD SYSTEM NOTICE</h3></div></div><label>Subject<input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Important OPD notice" /></label><label>Message<textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Enter the system-wide notice..." rows={5} /></label><div className="notice-actions"><button onClick={() => setNoticeOpen(false)}>CANCEL</button><button className="primary" disabled={saving} onClick={createNotice}>{saving ? "POSTING…" : "POST NOTICE"}</button></div></div></div>}
