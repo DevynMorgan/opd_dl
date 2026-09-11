@@ -13,11 +13,16 @@ function displayNameForUsername(username: string) {
   return username.trim() || "Officer";
 }
 
+function accountTitleForUsername(username: string) {
+  return username.trim().toLowerCase() === "maxvonb" ? "Officer #301" : "OPD";
+}
+
 function updateAccountHeader(username: string, role = "OFFICER") {
   const account = document.querySelector(".account-line > span:not(.chev)");
   if (account) {
     const displayName = displayNameForUsername(username);
-    account.innerHTML = `${displayName}<br><b>OPD</b>`;
+    const accountTitle = accountTitleForUsername(username);
+    account.innerHTML = `${displayName}<br><b>${accountTitle}</b>`;
   }
   document.documentElement.dataset.opdRole = role;
   if (role !== "ADMIN") applyOfficerRestrictions();
