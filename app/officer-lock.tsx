@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-
-const names: Record<string,string> = { sistergrimm: "Devyn Grimm", admin: "Jacob Grimm", maxvonb: "Max VonB", rowanc: "RowanC", killianm: "KillianM", malcomh: "MalcomH" };
-const numbers: Record<string,string> = { sistergrimm: "OPD", admin: "101", maxvonb: "301", rowanc: "203", killianm: "304", malcomh: "404" };
+import { officerIdentity } from "../lib/officer-identity";
 
 export default function OfficerLock() {
   useEffect(() => {
@@ -15,7 +13,7 @@ export default function OfficerLock() {
         if (label) input.value = label;
         input.readOnly = true;
         input.setAttribute("aria-readonly", "true");
-        input.title = "Automatically assigned from the signed-in account.";
+        input.title = "Automatically assigned from the signed-in account. This field cannot be changed.";
         input.onkeydown = e => e.preventDefault();
         input.onbeforeinput = e => e.preventDefault();
         input.onpaste = e => e.preventDefault();
@@ -23,17 +21,26 @@ export default function OfficerLock() {
         input.ondrop = e => e.preventDefault();
         input.oninput = () => { if (label && input.value !== label) input.value = label; };
         input.style.cursor = "not-allowed";
+        input.style.backgroundColor = "#e8eef4";
+        input.style.color = "#526d89";
+        input.style.fontWeight = "700";
       });
     };
-    fetch("/api/auth/me", { cache: "no-store" }).then(r => r.json()).then(data => {
-      const username = String(data?.user?.username || "").trim().toLowerCase();
-      if (username) label = `${names[username] || username} (#${numbers[username] || "OPD"})`;
-      apply();
-    }).catch(() => {});
+
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(r => r.json())
+      .then(data => {
+        const username = String(data?.user?.username || "").trim();
+        if (username) label = officerIdentity(username);
+        apply();
+      })
+      .catch(() => {});
+
     const observer = new MutationObserver(apply);
     observer.observe(document.body, { childList: true, subtree: true });
+    const interval = window.setInterval(apply, 250);
     apply();
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); window.clearInterval(interval); };
   }, []);
   return null;
 }
