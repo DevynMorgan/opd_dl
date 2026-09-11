@@ -46,11 +46,11 @@ export default function IncidentEnhancer() {
       if (disposed) return;
       const heading = Array.from(document.querySelectorAll("h2")).find(el => el.textContent?.trim() === "INCIDENTS");
       const panel = heading?.closest("section.module-card") as HTMLElement | null; if (!panel) return;
-      const user = await currentUser(); const admin = user?.role === "ADMIN";
+      const user = await currentUser(); const canCreate = Boolean(user);
       if (panel.dataset.incidentEnhanced !== "true") {
         panel.dataset.incidentEnhanced = "true";
         const toolbar = panel.querySelector(".module-toolbar") as HTMLElement | null;
-        if (toolbar && admin && !toolbar.querySelector(".incident-new-button")) { const button=document.createElement("button"); button.className="header-action incident-new-button"; button.innerHTML="＋ NEW INCIDENT REPORT"; button.addEventListener("click",()=>openCreateModal()); toolbar.appendChild(button); }
+        if (toolbar && canCreate && !toolbar.querySelector(".incident-new-button")) { const button=document.createElement("button"); button.className="header-action incident-new-button"; button.innerHTML="＋ NEW INCIDENT REPORT"; button.addEventListener("click",()=>openCreateModal()); toolbar.appendChild(button); }
       }
       await polishTable(panel);
     }
