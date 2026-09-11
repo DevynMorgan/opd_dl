@@ -4,13 +4,15 @@ import { useEffect } from "react";
 
 const names: Record<string,string> = {
   sistergrimm: "Devyn Grimm",
-  admin: "Chief",
+  admin: "Jacob Grimm",
   maxvonb: "Max VonB",
   rowanc: "RowanC",
   killianm: "KillianM",
   malcomh: "MalcomH",
 };
 const numbers: Record<string,string> = {
+  sistergrimm: "OPD",
+  admin: "101",
   maxvonb: "301",
   rowanc: "203",
   killianm: "304",
