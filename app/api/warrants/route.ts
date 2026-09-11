@@ -15,7 +15,7 @@ const nullableBigInt = (value: unknown) => { const n = Number(value); return Num
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) throw new Error("UNAUTHORIZED");
+    if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     await ensureSchema();
     const body = await request.json();
     const p = db();
