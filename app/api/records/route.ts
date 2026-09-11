@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result.rows);
     }
     if (type === "incidents") {
-      const result = await p.query(`SELECT * FROM incidents WHERE (${search}='' OR incident_number ILIKE '%'||${search}||'%' OR title ILIKE '%'||${search}||'%' OR COALESCE(location,'') ILIKE '%'||${search}||'%') ORDER BY occurred_at DESC LIMIT ${limitSql}`);
+      const result = await p.query(`SELECT * FROM incidents WHERE (${search}='' OR incident_number ILIKE '%'||${search}||'%' OR title ILIKE '%'||${search}||'%' OR COALESCE(location,'') ILIKE '%'||${search}||'%' OR COALESCE(incident_type,'') ILIKE '%'||${search}||'%' OR COALESCE(case_number,'') ILIKE '%'||${search}||'%' OR COALESCE(officer,'') ILIKE '%'||${search}||'%') ORDER BY occurred_at DESC LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     const result = await p.query(`SELECT * FROM messages WHERE (${search}='' OR subject ILIKE '%'||${search}||'%' OR body ILIKE '%'||${search}||'%') ORDER BY created_at DESC LIMIT ${limitSql}`);
@@ -78,7 +78,15 @@ export async function POST(request: NextRequest) {
     }
     if (type === "incidents") {
       const occurredAt = body.occurred_at || new Date().toISOString();
-      const r = await p.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes) VALUES (${sqlText(body.incident_number)},${sqlText(body.title)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(occurredAt)},${sqlText(clean(body.officer)||"1027")},${sqlNullableText(body.notes)}) RETURNING *`);
+      let incidentNumber = clean(body.incident_number);
+      if (!incidentNumber) {
+        await p.query("SELECT pg_advisory_xact_lock(hashtext('opd_incident_number'))");
+        const year = new Date(occurredAt).getFullYear();
+        const next = await p.query(`SELECT COALESCE(MAX(CASE WHEN incident_number ~ '^OPD-${year}-[0-9]+$' THEN CAST(SUBSTRING(incident_number FROM 10) AS INTEGER) ELSE 0 END),0)+1 AS next_number FROM incidents`);
+        incidentNumber = `OPD-${year}-${String(Number(next.rows[0].next_number)).padStart(4, "0")}`;
+      }
+      if (!clean(body.title)) return NextResponse.json({ error: "Incident title is required" }, { status: 400 });
+      const r = await p.query(`INSERT INTO incidents (incident_number,title,location,status,occurred_at,officer,notes,incident_type,case_number,description,persons_involved,evidence,officer_notes,related_warrant) VALUES (${sqlText(incidentNumber)},${sqlText(body.title)},${sqlNullableText(body.location)},${sqlText(clean(body.status)||"OPEN")},${sqlNullableTimestamp(occurredAt)},${sqlText(clean(body.officer)||"OPD Officer")},${sqlNullableText(body.notes)},${sqlNullableText(body.incident_type)},${sqlNullableText(body.case_number)},${sqlNullableText(body.description)},${sqlNullableText(body.persons_involved)},${sqlNullableText(body.evidence)},${sqlNullableText(body.officer_notes)},${sqlNullableText(body.related_warrant)}) RETURNING *`);
       return NextResponse.json(r.rows[0], { status: 201 });
     }
     if (type === "messages") {
@@ -105,31 +113,20 @@ export async function PUT(request: NextRequest) {
     const p = db();
     if (type === "people") {
       if (!clean(body.first_name) || !clean(body.last_name)) return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
-
-      // Driver License rows carry the license ID in `id`, while People rows carry the person ID.
-      // Resolve a license row back to its owning person before updating so Edit works from either view.
       let personId = id;
       const personCheck = await p.query(`SELECT id FROM people WHERE id=${id} LIMIT 1`);
       if (!personCheck.rows.length) {
         const licenseOwner = await p.query(`SELECT person_id FROM licenses WHERE id=${id} LIMIT 1`);
-        if (licenseOwner.rows.length && licenseOwner.rows[0].person_id !== null) {
-          personId = String(licenseOwner.rows[0].person_id);
-        }
+        if (licenseOwner.rows.length && licenseOwner.rows[0].person_id !== null) personId = String(licenseOwner.rows[0].person_id);
       }
-
       const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, gender=${sqlNullableText(body.gender)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${personId} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
       if (body.license_number !== undefined || body.license_class !== undefined) {
-        const license = sqlNullableText(body.license_number);
-        const licenseClass = sqlText(clean(body.license_class) || "C");
+        const license = sqlNullableText(body.license_number); const licenseClass = sqlText(clean(body.license_class) || "C");
         const existing = await p.query(`SELECT id FROM licenses WHERE person_id=${personId} ORDER BY id DESC LIMIT 1`);
-        if (license === "NULL") {
-          if (existing.rows.length) await p.query(`DELETE FROM licenses WHERE id=${existing.rows[0].id}`);
-        } else if (existing.rows.length) {
-          await p.query(`UPDATE licenses SET license_number=${license},license_class=${licenseClass} WHERE id=${existing.rows[0].id}`);
-        } else {
-          await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${personId},${license},${licenseClass},'VALID','RP record')`);
-        }
+        if (license === "NULL") { if (existing.rows.length) await p.query(`DELETE FROM licenses WHERE id=${existing.rows[0].id}`); }
+        else if (existing.rows.length) await p.query(`UPDATE licenses SET license_number=${license},license_class=${licenseClass} WHERE id=${existing.rows[0].id}`);
+        else await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${personId},${license},${licenseClass},'VALID','RP record')`);
       }
       const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class FROM people p WHERE p.id=${personId}`);
       return NextResponse.json(updated.rows[0]);
