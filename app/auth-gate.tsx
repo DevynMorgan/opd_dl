@@ -11,6 +11,8 @@ function displayNameForUsername(username: string) {
   if (normalized === "admin") return "Chief";
   if (normalized === "maxvonb") return "Max VonB";
   if (normalized === "rowanc") return "RowanC";
+  if (normalized === "killianm") return "KillianM";
+  if (normalized === "malcomh") return "MalcomH";
   return username.trim() || "Officer";
 }
 
@@ -18,6 +20,8 @@ function officerNumberForUsername(username: string) {
   const normalized = username.trim().toLowerCase();
   if (normalized === "maxvonb") return "301";
   if (normalized === "rowanc") return "203";
+  if (normalized === "killianm") return "304";
+  if (normalized === "malcomh") return "404";
   return "OPD";
 }
 
