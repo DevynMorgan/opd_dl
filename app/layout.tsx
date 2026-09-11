@@ -6,6 +6,7 @@ import LogoutHandler from "./logout-handler";
 import AdminEnhancer from "./admin-enhancer";
 import NotificationBell from "./notification-bell";
 import WarrantEnhancer from "./warrant-enhancer";
+import IncidentEnhancer from "./incident-enhancer";
 
 export const metadata: Metadata = {
   title: "Opaline Police Department | Records Terminal",
@@ -16,7 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <head><link rel="stylesheet" href="/admin.css" /></head>
-      <body><AuthGate><LogoutHandler /><AdminEnhancer /><NotificationBell /><WarrantEnhancer />{children}</AuthGate></body>
+      <body><AuthGate><LogoutHandler /><AdminEnhancer /><NotificationBell /><WarrantEnhancer /><IncidentEnhancer />{children}</AuthGate></body>
     </html>
   );
 }
