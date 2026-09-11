@@ -21,16 +21,59 @@ export default function WarrantEnhancer() {
       const headings = Array.from(document.querySelectorAll("h2"));
       const heading = headings.find(el => el.textContent?.trim() === "WARRANTS & BOLO");
       const panel = heading?.closest("section.module-card") as HTMLElement | null;
-      if (!panel || panel.dataset.warrantEnhanced === "true") return;
-      panel.dataset.warrantEnhanced = "true";
+      if (!panel) return;
 
-      const toolbar = panel.querySelector(".module-toolbar") as HTMLElement | null;
-      if (!toolbar) return;
-      const button = document.createElement("button");
-      button.className = "header-action warrant-new-button";
-      button.innerHTML = "＋ NEW WARRANT";
-      button.addEventListener("click", () => openModal());
-      toolbar.appendChild(button);
+      if (panel.dataset.warrantEnhanced !== "true") {
+        panel.dataset.warrantEnhanced = "true";
+        const toolbar = panel.querySelector(".module-toolbar") as HTMLElement | null;
+        if (toolbar) {
+          const button = document.createElement("button");
+          button.className = "header-action warrant-new-button";
+          button.innerHTML = "＋ NEW WARRANT";
+          button.addEventListener("click", () => openModal());
+          toolbar.appendChild(button);
+        }
+      }
+
+      const table = panel.querySelector("table") as HTMLTableElement | null;
+      if (!table) return;
+      const headRow = table.querySelector("thead tr");
+      if (headRow && !headRow.querySelector(".warrant-admin-action")) {
+        const th = document.createElement("th");
+        th.className = "warrant-admin-action";
+        th.textContent = "ADMIN";
+        headRow.appendChild(th);
+      }
+      table.querySelectorAll("tbody tr").forEach(row => {
+        if (row.querySelector(".warrant-delete-cell") || row.children.length < 1) return;
+        const warrantNumber = row.children[0]?.textContent?.trim() || "";
+        if (!warrantNumber || warrantNumber === "No matching fictional records.") return;
+        const td = document.createElement("td");
+        td.className = "warrant-delete-cell";
+        const button = document.createElement("button");
+        button.className = "warrant-delete-button";
+        button.type = "button";
+        button.textContent = "DELETE";
+        button.title = `Delete ${warrantNumber}`;
+        button.addEventListener("click", async e => {
+          e.stopPropagation();
+          if (!window.confirm(`Delete warrant ${warrantNumber}?\n\nThis permanently removes the fictional warrant from the RP database.`)) return;
+          button.disabled = true;
+          button.textContent = "DELETING…";
+          try {
+            const r = await fetch("/api/warrants", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ warrant_number: warrantNumber }) });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(data.error || "Could not delete warrant.");
+            row.remove();
+          } catch (error) {
+            button.disabled = false;
+            button.textContent = "DELETE";
+            window.alert(error instanceof Error ? error.message : "Could not delete warrant.");
+          }
+        });
+        td.appendChild(button);
+        row.appendChild(td);
+      });
     }
 
     const openModal = () => {
