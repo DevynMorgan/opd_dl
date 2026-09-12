@@ -1,0 +1,116 @@
+/* Mobile / tablet layout */
+@media (max-width: 900px) {
+  .topbar { height: auto; min-height: 128px; padding: 12px 14px; align-items: center; }
+  .brand { gap: 12px; min-width: 0; }
+  .patch { width: 105px; height: 105px; margin-top: 0; align-self: center; }
+  .brand-copy { min-width: 0; text-align: left; }
+  .brand-copy strong { font-size: 23px; line-height: 1.05; }
+  .brand-copy span { font-size: 11px; letter-spacing: 3px; margin-top: 5px; }
+  .brand-copy i { font-size: 8px; letter-spacing: 1.5px; margin-top: 9px; padding-top: 7px; }
+  .mountain-brand { display: none; }
+  .account { width: 180px; flex: 0 0 180px; padding: 10px 12px; }
+  .account-line { font-size: 10px; gap: 7px; }
+  .account-line svg { width: 19px; height: 19px; }
+  .account button { font-size: 10px; padding: 9px; margin-top: 8px; }
+
+  .content { display: block; min-height: 0; }
+  .sidebar { width: 100%; height: auto; padding: 8px 10px; border-right: 0; border-bottom: 1px solid #cbd8e5; display: block; }
+  .sidebar nav { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+  .sidebar nav button { flex: 0 0 auto; padding: 10px 11px; gap: 7px; font-size: 12px; white-space: nowrap; }
+  .sidebar nav button svg { width: 18px; height: 18px; }
+  .sidebar-note { display: none; }
+
+  .workspace { display: block; padding: 12px; width: 100%; max-width: none; }
+  .maincol { width: 100%; min-width: 0; }
+  .rightcol { width: 100%; margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .rightcol .scenic-card { grid-column: 1 / -1; height: 150px; }
+  .quick-card, .system-card { margin-top: 0; }
+
+  .section-heading { gap: 10px; min-width: 0; }
+  .section-heading svg { width: 32px; height: 32px; }
+  .section-heading h1 { font-size: 22px; }
+  .section-heading h2 { font-size: 21px; }
+  .section-heading p { font-size: 12px; line-height: 1.35; }
+  .search-card { padding: 15px 14px; }
+  .form-grid { gap: 12px; padding: 15px 14px 10px; }
+  .form-grid label { font-size: 13px; }
+  .actions { padding: 0 14px; }
+  .actions button { font-size: 13px; padding: 11px; }
+
+  .recent-card { padding: 14px 12px 10px; }
+  .module-toolbar { align-items: flex-start; }
+  .module-toolbar .section-heading { min-width: 0; }
+  .header-action { font-size: 10px; padding: 8px 9px; }
+  .module-search { margin-top: 8px; }
+  .table-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-wrap table { min-width: 620px; }
+  .detail-fields { grid-template-columns: 1fr 1fr; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .admin-panel { padding: 14px; }
+
+  .modal-backdrop { padding: 10px; }
+  .modal { max-height: calc(100vh - 20px); overflow: auto; padding: 17px; width: min(650px, 100%); }
+  .modal-grid { grid-template-columns: 1fr; }
+  .new-form { grid-template-columns: 1fr; }
+
+  footer { flex-direction: column; gap: 6px; text-align: center; padding: 11px 12px; font-size: 8px; }
+}
+
+@media (max-width: 600px) {
+  .topbar { min-height: 104px; padding: 8px 10px; }
+  .brand { gap: 8px; flex: 1 1 auto; min-width: 0; }
+  .patch { width: 70px; height: 70px; flex: 0 0 70px; }
+  .brand-copy strong { font-size: 16px; }
+  .brand-copy span { font-size: 8px; letter-spacing: 1.8px; }
+  .brand-copy i { font-size: 6px; letter-spacing: .8px; margin-top: 6px; padding-top: 5px; }
+  .account { width: 125px; flex: 0 0 125px; padding: 7px 8px; border-radius: 6px; }
+  .account-line { font-size: 8px; gap: 5px; }
+  .account-line svg { width: 16px; height: 16px; }
+  .account-line .chev { font-size: 16px; }
+  .account button { font-size: 8px; padding: 7px; gap: 5px; }
+  .account button svg { width: 14px; height: 14px; }
+
+  .sidebar { padding: 6px; }
+  .sidebar nav button { padding: 9px 10px; font-size: 11px; }
+  .workspace { padding: 9px; }
+  .section-heading { align-items: flex-start; padding-bottom: 12px; }
+  .section-heading svg { width: 27px; height: 27px; margin-top: 2px; }
+  .section-heading h1 { font-size: 19px; }
+  .section-heading h2 { font-size: 18px; }
+  .section-heading p { font-size: 10px; }
+  .tabs { grid-template-columns: 1fr 1fr 1fr; }
+  .tabs button { font-size: 10px; padding: 9px 4px; }
+  .form-grid { grid-template-columns: 1fr; gap: 10px; }
+  .form-grid input { height: 40px; }
+  .actions { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .recent-card { padding: 13px 11px 9px; }
+  .module-toolbar { display: block; }
+  .header-action { width: 100%; justify-content: center; margin-top: 4px; }
+  .module-search { padding: 8px 10px; }
+  .detail-fields { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .stat-card { padding: 14px; }
+  .rightcol { grid-template-columns: 1fr; }
+  .rightcol .scenic-card { height: 135px; }
+  .quick-card, .system-card { padding: 13px; }
+  .quick-card button { font-size: 12px; padding: 9px 3px; }
+  .messages { padding: 13px; }
+  .message-row { gap: 9px; padding: 12px 3px; }
+  .modal { padding: 15px; }
+  .detail-head { padding-right: 34px; }
+  .full-detail { padding: 12px; }
+  .close-detail, .modal-close { width: 29px; height: 29px; right: 9px; top: 9px; }
+}
+
+@media (max-width: 380px) {
+  .topbar { align-items: flex-start; }
+  .brand { align-items: center; }
+  .patch { width: 58px; height: 58px; flex-basis: 58px; }
+  .brand-copy strong { font-size: 14px; }
+  .brand-copy span { font-size: 7px; letter-spacing: 1px; }
+  .brand-copy i { display: none; }
+  .account { width: 105px; flex-basis: 105px; padding: 6px; }
+  .account-line { font-size: 7px; }
+  .account button { font-size: 7px; }
+}
