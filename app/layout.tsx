@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./additional.css";
 import "./case-panels.css";
+import "./mobile.css";
 import AuthGate from "./auth-gate";
 import LogoutHandler from "./logout-handler";
 import AdminEnhancer from "./admin-enhancer";
