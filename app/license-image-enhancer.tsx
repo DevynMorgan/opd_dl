@@ -27,7 +27,7 @@ function resizeImage(file: File): Promise<string> {
   });
 }
 
-function LicenseImagePanel({ licenseNumber, mount }: { licenseNumber: string; mount: HTMLElement }) {
+function LicenseImagePanel({ licenseNumber }: { licenseNumber: string }) {
   const [record, setRecord] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [admin, setAdmin] = useState(false);
@@ -64,7 +64,7 @@ function LicenseImagePanel({ licenseNumber, mount }: { licenseNumber: string; mo
     } finally { setSaving(false); }
   }
 
-  if (loading) return <div className="license-image-panel" ref={el => { if (el && !mount.contains(el)) mount.appendChild(el); }}><div className="license-image-loading">Loading license image…</div></div>;
+  if (loading) return <section className="license-image-panel"><div className="license-image-loading">Loading license image…</div></section>;
 
   return <>
     <section className="license-image-panel">
@@ -100,8 +100,8 @@ export default function LicenseImageEnhancer() {
       const key = `${licenseNumber}|${modal.textContent?.slice(0, 120) || ""}`;
       if (key === currentKey && activeMount.current?.isConnected) return;
       currentKey = key;
-      activeMount.current?.remove();
       rootRef.current?.unmount?.();
+      activeMount.current?.remove();
       const mount = document.createElement("div");
       mount.className = "license-image-mount";
       const actions = modal.querySelector(".modal-actions");
@@ -111,7 +111,7 @@ export default function LicenseImageEnhancer() {
       const { createRoot } = await import("react-dom/client");
       if (disposed) return;
       rootRef.current = createRoot(mount);
-      rootRef.current.render(<LicenseImagePanel licenseNumber={licenseNumber} mount={mount} />);
+      rootRef.current.render(<LicenseImagePanel licenseNumber={licenseNumber} />);
     };
 
     const observer = new MutationObserver(() => { void enhance(); });
