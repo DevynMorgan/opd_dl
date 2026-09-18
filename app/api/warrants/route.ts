@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         ) VALUES (
           ${personId},${text(warrantNumber)},${text(title)},${text(clean(body.priority) || "STANDARD")},
           ${text(clean(body.status) || "ACTIVE")},${nullableTimestamp(issuedAt)},${nullableText(body.location)},${text(officer)},${nullableText(body.notes)},
-          ${nullableText(body.warrant_type)},${text(charge || title)},${nullableDate(body.expiration_date)},${nullableText(body.bond)},${nullableText(body.case_number)},${nullableText(body.issuing_authority)}
+          ${nullableText(body.warrant_type)},${text(charge || title)},${nullableDate(body.expiration_date)},${nullableText(body.bond)},${nullableText(body.case_number)},${nullableText(body.issuing_authority)},${nullableText(subjectFirstName)},${nullableText(subjectLastName)},${nullableDate(body.subject_dob)},${nullableText(body.subject_alias)}
         ) RETURNING *
       `);
 
