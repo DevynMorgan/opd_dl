@@ -27,6 +27,10 @@ export async function POST(request: NextRequest) {
       ALTER TABLE warrants ADD COLUMN IF NOT EXISTS bond TEXT;
       ALTER TABLE warrants ADD COLUMN IF NOT EXISTS case_number TEXT;
       ALTER TABLE warrants ADD COLUMN IF NOT EXISTS issuing_authority TEXT;
+      ALTER TABLE warrants ADD COLUMN IF NOT EXISTS subject_first_name TEXT;
+      ALTER TABLE warrants ADD COLUMN IF NOT EXISTS subject_last_name TEXT;
+      ALTER TABLE warrants ADD COLUMN IF NOT EXISTS subject_dob DATE;
+      ALTER TABLE warrants ADD COLUMN IF NOT EXISTS subject_alias TEXT;
     `);
 
     const charge = clean(body.charge);
@@ -37,6 +41,9 @@ export async function POST(request: NextRequest) {
     const year = new Date(issuedAt).getFullYear();
     const officer = officerIdentity(user.username);
     const personId = nullableBigInt(body.person_id);
+    const subjectFirstName = clean(body.subject_first_name);
+    const subjectLastName = clean(body.subject_last_name);
+    if (personId === "NULL" && (!subjectFirstName || !subjectLastName)) return NextResponse.json({ error: "Subject first and last name are required when the person is not in the DL system." }, { status: 400 });
     const client = await p.connect();
     try {
       await client.query("SELECT pg_advisory_lock(hashtext('opd_warrant_number'))");
@@ -48,7 +55,7 @@ export async function POST(request: NextRequest) {
       const result = await client.query(`
         INSERT INTO warrants (
           person_id,warrant_number,title,priority,status,issued_at,location,officer,notes,
-          warrant_type,charge,expiration_date,bond,case_number,issuing_authority
+          warrant_type,charge,expiration_date,bond,case_number,issuing_authority,subject_first_name,subject_last_name,subject_dob,subject_alias
         ) VALUES (
           ${personId},${text(warrantNumber)},${text(title)},${text(clean(body.priority) || "STANDARD")},
           ${text(clean(body.status) || "ACTIVE")},${nullableTimestamp(issuedAt)},${nullableText(body.location)},${text(officer)},${nullableText(body.notes)},
