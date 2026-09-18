@@ -95,7 +95,7 @@ export default function LicenseImageEnhancer() {
         return;
       }
       const marker = modal.querySelector(".modal-head p")?.textContent?.trim() || "";
-      const licenseNumber = marker.match(/^OP-[A-Z0-9-]+$/i)?.[0] || "";
+      const licenseNumber = marker && !/^OPD database record$/i.test(marker) && !/^OPD database/i.test(marker) ? marker : "";
       if (!licenseNumber) return;
       const key = `${licenseNumber}|${modal.textContent?.slice(0, 120) || ""}`;
       if (key === currentKey && activeMount.current?.isConnected) return;
