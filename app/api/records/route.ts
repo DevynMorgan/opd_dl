@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result.rows);
     }
     if (type === "warrants") {
-      const result = await p.query(`SELECT w.*,CONCAT_WS(' ',p.first_name,p.last_name) AS name FROM warrants w LEFT JOIN people p ON p.id=w.person_id WHERE (${search}='' OR w.warrant_number ILIKE '%'||${search}||'%' OR w.title ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%') ORDER BY w.issued_at DESC LIMIT ${limitSql}`);
+      const result = await p.query(`SELECT w.*,COALESCE(NULLIF(CONCAT_WS(' ',p.first_name,p.last_name),''),NULLIF(CONCAT_WS(' ',w.subject_first_name,w.subject_last_name),''),'Unknown') AS name FROM warrants w LEFT JOIN people p ON p.id=w.person_id WHERE (${search}='' OR w.warrant_number ILIKE '%'||${search}||'%' OR w.title ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',w.subject_first_name,w.subject_last_name) ILIKE '%'||${search}||'%' OR COALESCE(w.subject_alias,'') ILIKE '%'||${search}||'%') ORDER BY w.issued_at DESC LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     if (type === "incidents") {
