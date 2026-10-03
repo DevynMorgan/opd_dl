@@ -136,7 +136,7 @@ export async function PUT(request: NextRequest) {
         else if (existing.rows.length) await p.query(`UPDATE licenses SET license_number=${license},license_class=${licenseClass},status=${licenseStatus} WHERE id=${existing.rows[0].id}`);
         else await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${personId},${license},${licenseClass},${licenseStatus},'RP record')`);
       }
-      const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class FROM people p WHERE p.id=${personId}`);
+      const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class, COALESCE((SELECT status FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_status FROM people p WHERE p.id=${personId}`);
       return NextResponse.json(updated.rows[0]);
     }
     return NextResponse.json({ error: "Editing is currently supported for person records." }, { status: 400 });
