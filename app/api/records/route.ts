@@ -129,12 +129,12 @@ export async function PUT(request: NextRequest) {
       }
       const r = await p.query(`UPDATE people SET first_name=${sqlText(body.first_name)}, last_name=${sqlText(body.last_name)}, dob=${sqlNullableDate(body.dob)}, gender=${sqlNullableText(body.gender)}, alias=${sqlNullableText(body.alias)}, address=${sqlNullableText(body.address)}, height=${sqlNullableText(body.height)}, weight=${sqlNullableText(body.weight)}, eyes=${sqlNullableText(body.eyes)}, hair=${sqlNullableText(body.hair)}, status=${sqlText(clean(body.status)||"ACTIVE")}, notes=${sqlNullableText(body.notes)} WHERE id=${personId} RETURNING *`);
       if (!r.rows.length) return NextResponse.json({ error: "Person record not found" }, { status: 404 });
-      if (body.license_number !== undefined || body.license_class !== undefined) {
-        const license = sqlNullableText(body.license_number); const licenseClass = sqlText(clean(body.license_class) || "C");
+      if (body.license_number !== undefined || body.license_class !== undefined || body.license_status !== undefined) {
+        const license = sqlNullableText(body.license_number); const licenseClass = sqlText(clean(body.license_class) || "C"); const licenseStatus = sqlText(clean(body.license_status) || "VALID");
         const existing = await p.query(`SELECT id FROM licenses WHERE person_id=${personId} ORDER BY id DESC LIMIT 1`);
         if (license === "NULL") { if (existing.rows.length) await p.query(`DELETE FROM licenses WHERE id=${existing.rows[0].id}`); }
-        else if (existing.rows.length) await p.query(`UPDATE licenses SET license_number=${license},license_class=${licenseClass} WHERE id=${existing.rows[0].id}`);
-        else await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${personId},${license},${licenseClass},'VALID','RP record')`);
+        else if (existing.rows.length) await p.query(`UPDATE licenses SET license_number=${license},license_class=${licenseClass},status=${licenseStatus} WHERE id=${existing.rows[0].id}`);
+        else await p.query(`INSERT INTO licenses (person_id,license_number,license_class,status,notes) VALUES (${personId},${license},${licenseClass},${licenseStatus},'RP record')`);
       }
       const updated = await p.query(`SELECT p.*, COALESCE((SELECT license_number FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_number, COALESCE((SELECT license_class FROM licenses WHERE person_id=p.id ORDER BY id DESC LIMIT 1),'') AS license_class FROM people p WHERE p.id=${personId}`);
       return NextResponse.json(updated.rows[0]);
