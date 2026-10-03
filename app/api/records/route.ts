@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result.rows);
     }
     if (type === "licenses") {
-      const result = await p.query(`SELECT l.*,p.first_name,p.last_name,p.dob,p.height,p.weight,p.eyes,p.hair,p.address,p.notes AS person_notes FROM licenses l JOIN people p ON p.id=l.person_id WHERE (${search}='' OR l.license_number ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR TO_CHAR(p.dob,'MM/DD/YYYY') ILIKE '%'||${search}||'%') ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
+      const result = await p.query(`SELECT l.*,p.first_name,p.last_name,p.dob,p.height,p.weight,p.eyes,p.hair,p.address,p.status AS person_status,p.notes AS person_notes FROM licenses l JOIN people p ON p.id=l.person_id WHERE (${search}='' OR l.license_number ILIKE '%'||${search}||'%' OR CONCAT_WS(' ',p.first_name,p.last_name) ILIKE '%'||${search}||'%' OR TO_CHAR(p.dob,'MM/DD/YYYY') ILIKE '%'||${search}||'%') ORDER BY p.last_name,p.first_name LIMIT ${limitSql}`);
       return NextResponse.json(result.rows);
     }
     if (type === "warrants") {
